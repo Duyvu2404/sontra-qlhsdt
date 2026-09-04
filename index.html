@@ -32,20 +32,12 @@ footer{text-align:center;color:#8792a5;font-size:12px;padding:30px 15px}
 .signature-upload{border:1px dashed #b9c9e8;border-radius:15px;padding:12px;background:#f8fbff}.signature-upload input{background:#fff}.signature-preview{height:118px;margin-top:9px;border-radius:11px;border:1px solid #e0e7f1;background:#fff;display:grid;place-items:center;overflow:hidden;color:#7b879a;font-size:12px}.signature-preview img{display:block;width:100%;height:100%;object-fit:contain;transform-origin:center;transition:transform .12s}.signature-zoom{display:grid;grid-template-columns:auto 1fr 48px;align-items:center;gap:9px;margin-top:10px;font-size:11px;font-weight:800;color:#5e6b80}.signature-zoom input{padding:0;box-shadow:none}.signature-zoom output{text-align:right;color:#2256d8}.zone-box{position:absolute;border:2px solid rgba(34,86,216,.82);background:rgba(34,86,216,.09);border-radius:5px;cursor:move;z-index:12;touch-action:none;box-shadow:0 0 0 1px rgba(255,255,255,.75) inset}.zone-box.signature{border-color:#0f8a72;background:rgba(15,138,114,.1)}.zone-box.active{box-shadow:0 0 0 3px rgba(34,86,216,.2)}.zone-delete{position:absolute;right:-9px;top:-11px;width:22px;height:22px;padding:0;border:2px solid #fff;border-radius:50%;background:#c23838;color:#fff;font:900 13px/18px system-ui;display:grid;place-items:center;box-shadow:0 3px 10px rgba(0,0,0,.22);cursor:pointer;opacity:0;visibility:hidden;pointer-events:none;transform:scale(.75);transition:.16s}.zone-resize{position:absolute;right:-6px;bottom:-6px;width:14px;height:14px;border:2px solid #fff;border-radius:4px;background:#2256d8;box-shadow:0 2px 8px rgba(0,0,0,.22);cursor:nwse-resize;opacity:0;visibility:hidden;pointer-events:none;transform:scale(.75);transition:.16s}.zone-box:hover .zone-delete,.zone-box:hover .zone-resize,.zone-box.active .zone-delete,.zone-box.active .zone-resize{opacity:1;visibility:visible;pointer-events:auto;transform:scale(1)}.zone-box.signature .zone-resize{background:#0f8a72}.zone-tag{position:absolute;z-index:13;max-width:240px;padding:3px 6px;border-radius:6px;background:#2256d8;color:#fff;font:750 10px/1.2 system-ui;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;box-shadow:0 3px 9px rgba(25,49,98,.18);opacity:0;visibility:hidden;transform:translateY(3px);transition:.16s}.zone-box:hover+.zone-tag,.zone-box.active+.zone-tag{opacity:1;visibility:visible;transform:translateY(0)}.zone-tag.signature{background:#0f8a72}
 details>textarea{width:calc(100% - 28px)}
 .pdf-signature-drag{position:absolute;overflow:hidden;touch-action:none;cursor:grab;outline:1.5px dashed transparent;outline-offset:2px;border-radius:4px;transition:outline-color .15s,box-shadow .15s;z-index:8}.pdf-signature-drag:hover,.pdf-signature-drag.dragging{outline-color:#16816d;box-shadow:0 0 0 4px rgba(22,129,109,.11)}.pdf-signature-drag:active{cursor:grabbing}.pdf-signature-drag img{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:contain;pointer-events:none;user-select:none;transform-origin:center}.pdf-signature-drag::after{content:"Kéo để căn chữ ký";position:absolute;left:50%;top:4px;transform:translateX(-50%);padding:3px 7px;border-radius:999px;background:rgba(18,96,82,.9);color:#fff;font:800 9px/1.2 ui-sans-serif,system-ui;white-space:nowrap;opacity:0;pointer-events:none;transition:.15s}.pdf-signature-drag:hover::after,.pdf-signature-drag.dragging::after{opacity:1}.drive-link-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:9px;align-items:center}.btn-link{text-decoration:none}
-
-html[data-parent-mode="1"] .navbtn[data-page="admin"]{display:none!important}
-
-/* ===== Admin Portal 9.0 · root admin + parent-only public home ===== */
-.guide-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.guide-card{padding:20px}.guide-card>span{display:inline-grid;place-items:center;min-width:34px;height:28px;padding:0 8px;border-radius:9px;background:#edf3ff;color:var(--pri);font-size:11px;font-weight:950;margin-bottom:13px}.guide-card>b{display:block;font-size:16px}.guide-card>p{margin:7px 0 0;color:var(--muted);font-size:12.5px;line-height:1.55}.admin-entry-grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(360px,.85fr);gap:18px;align-items:stretch;margin:28px auto;max-width:1120px}.admin-entry-guide{border-radius:24px;padding:28px;background:linear-gradient(145deg,#173cae,#246bc6 58%,#118272);color:#fff;box-shadow:var(--shadow)}.admin-entry-guide h1{font-size:clamp(27px,3vw,40px);line-height:1.06;margin:9px 0 12px;letter-spacing:-.035em}.admin-entry-guide p{margin:0;color:#eaf1ff;line-height:1.6;font-size:13px}.admin-entry-steps{display:grid;gap:9px;margin-top:20px}.admin-entry-step{display:grid;grid-template-columns:28px 1fr;gap:10px;align-items:start;padding:10px 11px;border:1px solid rgba(255,255,255,.17);border-radius:13px;background:rgba(255,255,255,.08)}.admin-entry-step i{font-style:normal;width:25px;height:25px;border-radius:8px;background:rgba(255,255,255,.16);display:grid;place-items:center;font-size:10px;font-weight:950}.admin-entry-step b{display:block;font-size:12px}.admin-entry-step small{display:block;color:#dce8ff;margin-top:2px;line-height:1.45}.admin-entry-login{display:flex;align-items:center}.admin-entry-login>.card{width:100%;margin:0!important;box-shadow:0 12px 34px rgba(29,44,76,.08)}.admin-inline-status{margin:0 0 12px;padding:8px 10px;border-radius:10px;background:#fff7e8;border:1px solid #f1dfbd;color:#795b24;font-size:11px;line-height:1.45}
-#page-admin .sectionHead{margin:22px 2px 11px}#page-admin .sectionHead h2{font-size:22px}#page-admin .sectionHead p{font-size:11.5px;margin-top:3px}#page-admin .card.panel{padding:18px}#page-admin .notice{padding:8px 10px 8px 32px;border-radius:10px;font-size:11.5px;line-height:1.4;box-shadow:none}#page-admin .notice::before{left:9px;top:8px;width:16px;height:16px;border-radius:6px;font-size:9px}#page-admin .field-hint{font-size:10.5px;line-height:1.4}#page-admin .setup-guide{font-size:10.8px;line-height:1.5;padding:10px 12px}#page-admin .section-box{padding:10px 12px;border-radius:12px}#page-admin .record{padding:10px 12px}#page-admin details>summary{padding:11px 13px;font-size:12px}#page-admin .sidebar{padding:9px}#page-admin .sidebtn{padding:10px 11px;font-size:12px;margin:1px 0}.admin-sync-chip{font-size:10px;font-weight:850;padding:5px 8px;border-radius:999px;background:#eaf8f4;color:#246f5f;margin-left:auto}
-@media(max-width:900px){.guide-grid{grid-template-columns:1fr}.admin-entry-grid{grid-template-columns:1fr}.admin-entry-login{display:block}}
-/* ===== End Admin Portal 9.0 ===== */
 </style>
 </head>
 <body>
-<header class="top"><div class="nav"><div class="brand"><div class="logo">ST</div><div>SmartForms<small>Hệ thống hồ sơ điện tử</small></div></div><div class="navright"><button class="navbtn" data-page="home">Hướng dẫn</button><button class="navbtn" data-page="lookup">Tra cứu</button><button class="navbtn active" data-page="admin">Quản trị</button></div></div></header>
+<header class="top"><div class="nav"><div class="brand"><div class="logo">ST</div><div>SmartForms<small>Hệ thống hồ sơ điện tử</small></div></div><div class="navright"><button class="navbtn active" data-page="home">Trang chủ</button><button class="navbtn" data-page="lookup">Tra cứu</button><button class="navbtn" data-page="admin">Quản trị</button></div></div></header>
 <main class="wrap">
-<section id="page-home" class="hidden"><div class="hero admin-guide-hero"><span class="pill">✦ SmartForms Admin</span><h1>Quản lý biểu mẫu và hồ sơ trên một hệ dữ liệu chung.</h1><p>Trang này dành cho quản trị viên. Biểu mẫu dành cho phụ huynh chỉ xuất hiện ở link công khai riêng do Admin tạo.</p><div class="actions"><button class="btn light" onclick="goPage('admin')">Đăng nhập quản trị →</button></div></div><div class="sectionHead"><div><h2>Cách hệ thống hoạt động</h2><p>Ba bước chính, không hiển thị danh sách biểu mẫu công khai tại link GitHub gốc.</p></div></div><div class="guide-grid"><div class="card guide-card"><span>01</span><b>Admin đăng nhập</b><p>Dùng cùng tài khoản quản trị ở mọi thiết bị và trình duyệt.</p></div><div class="card guide-card"><span>02</span><b>Dữ liệu được đồng bộ</b><p>Biểu mẫu, trạng thái công khai và hồ sơ được lấy từ nguồn Drive/Apps Script dùng chung.</p></div><div class="card guide-card"><span>03</span><b>Gửi link riêng cho phụ huynh</b><p>Phụ huynh chỉ thấy biểu mẫu đang công khai và chức năng tra cứu, không thấy đăng nhập Admin.</p></div></div></section>
+<section id="page-home"><div class="hero"><span class="pill">✦ Biểu mẫu điện tử</span><h1>Điền hồ sơ trực tiếp trên mẫu PDF chính thức.</h1><p>Biểu mẫu được nhận diện từ PDF, dữ liệu được đặt đúng vị trí trên chính mẫu PDF và lưu lại để nhà trường xử lý.</p><div class="actions"><button class="btn light" onclick="document.querySelector('#formsHead').scrollIntoView({behavior:'smooth'})">Xem biểu mẫu ↓</button><button class="btn secondary" onclick="goPage('lookup')">Tra cứu hồ sơ</button></div></div><div class="sectionHead" id="formsHead"><div><h2>Biểu mẫu đang công khai</h2><p>Chọn thủ tục cần thực hiện.</p></div></div><div class="grid" id="publicForms"></div></section>
 <section id="page-lookup" class="hidden"><div class="sectionHead"><div><h2>Tra cứu hồ sơ</h2><p>Nhập đúng bộ thông tin đã sử dụng khi làm hồ sơ.</p></div></div><div class="card panel"><div class="notice warn">Hệ thống chỉ trả kết quả khi toàn bộ thông tin xác minh khớp.</div><form id="lookupForm" class="formgrid" style="margin-top:16px"></form><div id="lookupResult"></div></div></section>
 <section id="page-admin" class="hidden"><div id="adminGate"></div><div id="adminApp" class="hidden"><div class="adminlayout"><aside class="card sidebar"><button class="sidebtn active" data-av="dashboard">Tổng quan</button><button class="sidebtn" data-av="forms">Biểu mẫu PDF</button><button class="sidebtn" data-av="records">Hồ sơ</button><button class="sidebtn" data-av="gmail">Gmail & Lịch gửi</button><button class="sidebtn" data-av="settings">Cài đặt</button><button class="sidebtn" onclick="logoutAdmin()">Đăng xuất</button></aside><div><div id="av-dashboard"></div><div id="av-forms" class="hidden"></div><div id="av-records" class="hidden"></div><div id="av-gmail" class="hidden"></div><div id="av-drive" class="hidden"></div><div id="av-settings" class="hidden"></div></div></div></div></section>
 </main><footer>ST SmartForms</footer>
@@ -629,7 +621,7 @@ function driveErrorMessage(error,formTitle=''){let raw=String(error?.message||er
 async function postGoogleConfirmed(payload,timeout=90000){let g=await gmailSettings();assertGoogleConfig(g);let requestId=driveRequestId(),started=Date.now();await fetch(g.endpoint,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({...payload,token:g.token,requestId})});while(Date.now()-started<timeout){await driveWait(650);let r=await jsonp(g.endpoint,{action:'requestStatus',token:g.token,requestId},20000);if(!r.ok)throw new Error(r.error||'Không đọc được trạng thái xử lý từ Google.');if(r.pending)continue;if(r.result?.ok)return r.result;throw new Error(r.result?.message||'Google từ chối yêu cầu.')}throw new Error('Google xử lý quá lâu và chưa xác nhận yêu cầu. Hãy thử lại.')}
 async function postGoogleMailConfirmed(payload,jobId,timeout=90000){let g=await gmailSettings();assertGoogleConfig(g);let started=Date.now();await fetch(g.endpoint,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({...payload,token:g.token})});while(Date.now()-started<timeout){await driveWait(850);let r=await jsonp(g.endpoint,{action:'mailStatus',token:g.token,jobId},20000);if(!r.ok)throw new Error(r.error||'Không đọc được trạng thái lịch gửi từ Google.');if(!r.job)continue;if(r.job.status==='Lỗi')throw new Error(r.job.error||'Gmail không thể tạo lịch gửi.');if(r.job.status==='Đã lên lịch'||r.job.status==='Đã gửi')return r.job;}throw new Error('Google chưa tạo được lịch gửi trong thời gian chờ. Hãy kiểm tra phần Executions của Apps Script hoặc thử lại.')}
 function driveFilePart(s,fallback='Hồ sơ'){return(cleanSpace(s)||fallback).replace(/[\\/:*?"<>|#%{}]/g,'-').replace(/\s*-\s*-+/g,' - ').slice(0,100)}function applicationPdfName(a){let i=a.identity||{},parts=[driveFilePart(a.code,'Mã hồ sơ'),driveFilePart(i.studentName||i.parentName,'Họ và tên học sinh'),i.dob?driveFilePart(formatDate(i.dob),''):'',i.className?driveFilePart(i.className,''):'',driveFilePart(a.formTitle,'Hồ sơ')].filter(Boolean);return parts.join(' - ')+'.pdf'}
-let BUILTIN_PUBLIC_ENDPOINT='';
+const BUILTIN_PUBLIC_ENDPOINT='';
 const PUBLIC_ENDPOINT_KEY='st_smartforms_public_endpoint_v1',PUBLIC_ENDPOINT_PARAM='sf_service';
 function validPublicEndpoint(value){return/^https:\/\/script\.google\.com\/macros\/s\/[-\w]+\/exec(?:\?|$)/i.test(String(value||'').trim())}
 function rememberPublicEndpoint(value){let endpoint=String(value||'').trim();if(!validPublicEndpoint(endpoint))return'';state.publicEndpoint=endpoint;try{localStorage.setItem(PUBLIC_ENDPOINT_KEY,endpoint)}catch{}return endpoint}
@@ -1837,59 +1829,36 @@ function jsonp_(callback,value){return ContentService.createTextOutput(callback+
  /* ===== End chỉnh sửa hồ sơ ===== */
 
  /* ===== Google Drive phân cấp · thay thế đúng hồ sơ hiện tại ===== */
- const DRIVE_HIERARCHY_APPS_SCRIPT=String.raw`const API_VERSION='ST SmartForms Drive Simple 9.0';
-const SYSTEM_ROOT='ST SmartForms';
-const ADMIN_FOLDER='00 - Thông tin Admin';
-const FORMS_ROOT='01 - Biểu mẫu';
-const FORM_SOURCE='01 - File gốc';
-const FORM_RECORDS='02 - Hồ sơ học sinh';
-const ADMIN_FILE='admin.json';
+ const DRIVE_HIERARCHY_APPS_SCRIPT=String.raw`const API_VERSION='ST SmartForms Drive Hierarchy 7.0';
+const SYSTEM_ROOT='ST SmartForms - Hồ sơ hành chính';
+const FORM_SOURCE='01 - Biểu mẫu gốc';
+const FORM_RECORDS='02 - Hồ sơ đã tiếp nhận';
 
 function setupSmartFormsDrive(){
   DriveApp.getRootFolder().getName();
   const props=PropertiesService.getScriptProperties();
   let token=props.getProperty('SMARTFORMS_DRIVE_TOKEN');
-  if(!token){
-    token=Utilities.getUuid().replace(/-/g,'')+Utilities.getUuid().replace(/-/g,'');
-    props.setProperty('SMARTFORMS_DRIVE_TOKEN',token);
-  }
-  const email=Session.getEffectiveUser().getEmail()||Session.getActiveUser().getEmail()||'(Google không cung cấp email)';
+  if(!token){token=Utilities.getUuid().replace(/-/g,'')+Utilities.getUuid().replace(/-/g,'');props.setProperty('SMARTFORMS_DRIVE_TOKEN',token)}
+  const email=Session.getEffectiveUser().getEmail()||Session.getActiveUser().getEmail()||'(Google khong cung cap email)';
   console.log('SMARTFORMS_DRIVE_TOKEN: '+token);
-  console.log('Tài khoản Apps Script: '+email);
-  return {ok:true,apiVersion:API_VERSION,token:token,serviceAccount:email};
+  console.log('Tai khoan can quyen Chinh sua thu muc me: '+email);
+  return{ok:true,apiVersion:API_VERSION,token:token,serviceAccount:email};
 }
 
 function doPost(e){
   let requestId='';
   try{
-    const data=JSON.parse((e.postData&&e.postData.contents)||'{}');
-    requestId=requestId_(data.requestId);
+    const data=JSON.parse((e.postData&&e.postData.contents)||'{}');requestId=requestId_(data.requestId);
     if(data.action==='publicUpload')return publicUpload_(data,requestId);
-    if(data.action==='adminLogin')return adminLogin_(data,requestId);
-    if(data.action==='adminBootstrap'){requireMasterToken_(data.token);return adminBootstrap_(data,requestId)}
-    if(data.action==='adminConfig'){requireToken_(data.token);return adminConfig_(data,requestId)}
     requireToken_(data.token);
-    if(data.action==='adminAuthPut')return adminAuthPut_(data,requestId);
-    if(data.action==='adminStatePut')return requestText_(requestId,true,'state ignored',{updatedAt:new Date().toISOString()});
     if(data.action==='driveSync'){
       const base=folder_(data.folder),kind=data.kind==='form'?'form':'app',meta=JSON.parse(data.metaJson||'{}'),itemKey=safe_(data.itemKey),pdfName=fileName_(data.pdfName||'file.pdf');
       if(!itemKey||itemKey==='item')throw new Error('invalid item key');
-      if(kind==='form'){
-        meta.id=String(meta.id||itemKey);
-        writeForm_(base,itemKey,meta,pdfName,data.pdfBase64);
-        savePublicConfig_(meta,data.folder);
-      }else{
-        meta.id=String(meta.id||itemKey);
-        meta.formId=String(meta.formId||data.formId||'');
-        meta.formTitle=String(meta.formTitle||data.formTitle||'Hồ sơ');
-        writeApp_(base,itemKey,meta,pdfName,data.pdfBase64);
-      }
+      if(kind==='form'){meta.id=String(meta.id||itemKey);writeForm_(base,itemKey,meta,pdfName,data.pdfBase64);savePublicConfig_(meta,data.folder)}
+      else{meta.id=String(meta.id||itemKey);meta.formId=String(meta.formId||data.formId||'');meta.formTitle=String(meta.formTitle||data.formTitle||'Ho so');writeApp_(base,itemKey,meta,pdfName,data.pdfBase64)}
       return requestText_(requestId,true,'synced',{itemKey:itemKey,revision:Number(meta.revision||1),pdfName:pdfName});
     }
-    if(data.action==='formUnregister'){
-      PropertiesService.getScriptProperties().deleteProperty('PUBLIC_FORM_'+safe_(data.formId));
-      return requestText_(requestId,true,'unregistered');
-    }
+    if(data.action==='formUnregister'){PropertiesService.getScriptProperties().deleteProperty('PUBLIC_FORM_'+safe_(data.formId));return requestText_(requestId,true,'unregistered')}
     return requestText_(requestId,false,'invalid action');
   }catch(err){return requestText_(requestId,false,errorText_(err))}
 }
@@ -1897,8 +1866,7 @@ function doPost(e){
 function doGet(e){
   const q=e.parameter||{},callback=/^[A-Za-z_$][\w$.]*$/.test(q.callback||'')?q.callback:'cb';
   try{
-    if(q.action==='publicHealth')return jsonp_(callback,{ok:true,apiVersion:API_VERSION,publicUpload:true,maxPdfMb:10,sharedAdmin:true});
-    if(q.action==='adminAuthInfo')return jsonp_(callback,adminAuthInfo_());
+    if(q.action==='publicHealth')return jsonp_(callback,{ok:true,apiVersion:API_VERSION,publicUpload:true,maxPdfMb:10});
     if(q.action==='publicCatalog')return jsonp_(callback,{ok:true,apiVersion:API_VERSION,forms:publicCatalog_()});
     if(q.action==='publicRequestStatus')return jsonp_(callback,requestStatus_(q.requestId));
     if(q.action==='publicForm'){
@@ -1906,7 +1874,7 @@ function doGet(e){
       const base=folder_(cfg.folderUrl),home=formFolder_(base,cfg.formId,cfg.title,false),source=home?findChild_(home,FORM_SOURCE):null,meta=source?readMeta_(source):null;
       if(!meta||!meta.published)return jsonp_(callback,{ok:false,error:'form unavailable'});
       const pdf=readPdf_(source,meta._drivePdfName);if(!pdf)return jsonp_(callback,{ok:false,error:'missing pdf'});
-      return jsonp_(callback,{ok:true,form:publicFormMeta_(meta),pdfBase64:Utilities.base64Encode(pdf.getBlob().getBytes())});
+      return jsonp_(callback,{ok:true,form:meta,pdfBase64:Utilities.base64Encode(pdf.getBlob().getBytes())});
     }
     if(q.action==='publicHas'){
       const cfg=publicConfig_(q.formId);if(!cfg)return jsonp_(callback,{ok:false,error:'form unavailable'});
@@ -1917,10 +1885,9 @@ function doGet(e){
     if(q.action==='bridgeHealth')return jsonp_(callback,{ok:true,apiVersion:API_VERSION,serviceAccount:Session.getEffectiveUser().getEmail()||Session.getActiveUser().getEmail()||'',writeService:'DriveApp'});
     if(q.action==='requestStatus')return jsonp_(callback,requestStatus_(q.requestId));
     if(q.action==='adminCatalog')return jsonp_(callback,{ok:true,apiVersion:API_VERSION,folders:adminCatalog_()});
-    if(q.action==='adminStateGet')return jsonp_(callback,{ok:true,apiVersion:API_VERSION,state:{settings:[],emails:[],updatedAt:''}});
     const base=folder_(q.folder);
     if(q.action==='driveHealth'){
-      ensureStructure_(base,true);
+      systemRoot_(base,true);
       const probe=base.createFile(Utilities.newBlob('SmartForms write test '+new Date().toISOString(),'text/plain','ST_SmartForms_write_test.txt'));probe.setTrashed(true);
       return jsonp_(callback,{ok:true,apiVersion:API_VERSION,folderName:base.getName(),folderId:base.getId(),writeAccess:true,systemFolder:SYSTEM_ROOT,serviceAccount:Session.getEffectiveUser().getEmail()||Session.getActiveUser().getEmail()||''});
     }
@@ -1928,9 +1895,7 @@ function doGet(e){
       const home=formFolder_(base,q.formId||(q.kind==='form'?q.itemKey:''),'',false),item=q.kind==='form'?(home?findChild_(home,FORM_SOURCE):null):(home?appFolder_(home,q.itemKey,{},false):null),meta=item?readMeta_(item):null,pdf=meta?readPdf_(item,meta._drivePdfName):null;
       return jsonp_(callback,{ok:true,exists:!!(item&&meta&&(!q.pdfName||pdf)),revision:Number(meta&&meta.revision||0)});
     }
-    if(q.action==='driveList'){
-      const out=[];listHierarchy_(base,out);return jsonp_(callback,{ok:true,items:out,systemFolder:SYSTEM_ROOT});
-    }
+    if(q.action==='driveList'){const out=[];listHierarchy_(base,out);return jsonp_(callback,{ok:true,items:out,systemFolder:SYSTEM_ROOT})}
     if(q.action==='driveItem'){
       const home=formFolder_(base,q.formId||(q.kind==='form'?q.itemKey:''),'',false),item=q.kind==='form'?(home?findChild_(home,FORM_SOURCE):null):(home?appFolder_(home,q.itemKey,{},false):null);
       if(!item)return jsonp_(callback,{ok:false,error:'not found'});
@@ -1949,138 +1914,69 @@ function publicUpload_(data,requestId){
   const lock=LockService.getScriptLock();if(!lock.tryLock(30000))return requestText_(requestId,false,'service busy');
   try{
     const cache=CacheService.getScriptCache(),rateKey='UPLOAD_'+safe_(cfg.formId),count=Number(cache.get(rateKey)||0);if(count>=80)return requestText_(requestId,false,'rate limited');cache.put(rateKey,String(count+1),60);
-    meta.driveSyncStatus='Đã chuyển lên Drive';meta.driveUploadedAt=new Date().toISOString();meta.formTitle=String(meta.formTitle||cfg.title||'Hồ sơ');
+    meta.driveSyncStatus='Da chuyen len Drive';meta.driveUploadedAt=new Date().toISOString();meta.formTitle=String(meta.formTitle||cfg.title||'Ho so');
     writeApp_(folder_(cfg.folderUrl),itemKey,meta,pdfName,b64);
     return requestText_(requestId,true,'synced',{itemKey:itemKey,revision:Number(meta.revision||1),pdfName:pdfName});
   }finally{lock.releaseLock()}
 }
 
 function writeForm_(base,itemKey,meta,pdfName,pdfBase64){
-  const home=formFolder_(base,meta.id||itemKey,meta.title||'Biểu mẫu',true),source=child_(home,FORM_SOURCE),old=readMeta_(source)||{};
+  const home=formFolder_(base,meta.id||itemKey,meta.title||'Bieu mau',true),source=child_(home,FORM_SOURCE),old=readMeta_(source)||{};
   if(pdfBase64){assertPdfSize_(pdfBase64);replacePdf_(source,pdfName,pdfBase64)}else if(!readPdf_(source,old._drivePdfName))throw new Error('missing form pdf');
-  meta._drivePdfName=pdfName||old._drivePdfName||'';
-  meta.driveHierarchyPath=SYSTEM_ROOT+'/'+FORMS_ROOT+'/'+home.getName()+'/'+FORM_SOURCE;
-  upText_(source,'metadata.json',JSON.stringify(meta));
-  child_(home,FORM_RECORDS);
+  meta._drivePdfName=pdfName||old._drivePdfName||'';meta.driveHierarchyPath=SYSTEM_ROOT+'/'+home.getName()+'/'+FORM_SOURCE;upText_(source,'metadata.json',JSON.stringify(meta));
 }
-
 function writeApp_(base,itemKey,meta,pdfName,pdfBase64){
   if(!meta.formId)throw new Error('missing form id');
-  const home=formFolder_(base,meta.formId,meta.formTitle||'Hồ sơ',true),item=appFolder_(home,itemKey,meta,true),old=readMeta_(item)||{};assertIncoming_(meta,old);
+  const home=formFolder_(base,meta.formId,meta.formTitle||'Ho so',true),item=appFolder_(home,itemKey,meta,true),old=readMeta_(item)||{};assertIncoming_(meta,old);
   if(pdfBase64){assertPdfSize_(pdfBase64);replacePdf_(item,pdfName,pdfBase64)}else if(!readPdf_(item,old._drivePdfName))throw new Error('missing app pdf');
-  meta._drivePdfName=pdfName||old._drivePdfName||'';
-  meta.driveHierarchyPath=SYSTEM_ROOT+'/'+FORMS_ROOT+'/'+home.getName()+'/'+FORM_RECORDS+'/'+item.getName();
-  upText_(item,'metadata.json',JSON.stringify(meta));
+  meta._drivePdfName=pdfName||old._drivePdfName||'';meta.driveHierarchyPath=SYSTEM_ROOT+'/'+home.getName()+'/'+FORM_RECORDS+'/'+item.getName();upText_(item,'metadata.json',JSON.stringify(meta));
 }
-
 function assertIncoming_(incoming,current){
-  if(!current||!current.id)return;
-  const nextRevision=Number(incoming.revision||1),oldRevision=Number(current.revision||1),nextTime=String(incoming.lastEditedAt||incoming.updatedAt||incoming.submittedAt||''),oldTime=String(current.lastEditedAt||current.updatedAt||current.submittedAt||'');
+  if(!current||!current.id)return;const nextRevision=Number(incoming.revision||1),oldRevision=Number(current.revision||1),nextTime=String(incoming.lastEditedAt||incoming.updatedAt||incoming.submittedAt||''),oldTime=String(current.lastEditedAt||current.updatedAt||current.submittedAt||'');
   if(nextRevision<oldRevision||(nextRevision===oldRevision&&nextTime&&oldTime&&nextTime<oldTime))throw new Error('stale revision');
 }
-function assertPdfSize_(b64){if(!b64||String(b64).length>14000000)throw new Error('PDF vượt quá 10 MB')}
+function assertPdfSize_(b64){if(!b64||String(b64).length>14000000)throw new Error('PDF vuot qua 10 MB')}
 function replacePdf_(folder,name,b64){
   const fresh=folder.createFile(Utilities.newBlob(Utilities.base64Decode(String(b64)),'application/pdf',name)).setName(name),freshId=fresh.getId(),files=folder.getFiles();
   while(files.hasNext()){const file=files.next();if(file.getId()!==freshId&&/\.pdf$/i.test(file.getName()))try{file.setTrashed(true)}catch(err){}}
   return fresh;
 }
 
-function ensureStructure_(base,create){
-  const root=create?child_(base,SYSTEM_ROOT):findChild_(base,SYSTEM_ROOT);if(!root)return null;
-  const admin=create?child_(root,ADMIN_FOLDER):findChild_(root,ADMIN_FOLDER);
-  const forms=create?child_(root,FORMS_ROOT):findChild_(root,FORMS_ROOT);
-  return {root:root,admin:admin,forms:forms};
-}
+function systemRoot_(base,create){return create?child_(base,SYSTEM_ROOT):findChild_(base,SYSTEM_ROOT)}
 function marker_(id){return'['+safe_(id)+']'}
 function markedId_(name){const m=String(name||'').match(/\[([A-Za-z0-9_.-]+)\]\s*$/);return m?m[1]:''}
 function findMarkedChild_(parent,id){if(!parent)return null;const marker=marker_(id),folders=parent.getFolders();while(folders.hasNext()){const folder=folders.next(),name=folder.getName();if(name.slice(-marker.length)===marker||name===safe_(id))return folder}return null}
-function folderLabel_(value,fallback){return(String(value||fallback||'Mục').replace(/[\\\/:*?"<>|#%{}]/g,'-').replace(/\s+/g,' ').trim()||fallback||'Mục').slice(0,90)}
+function folderLabel_(value,fallback){return(String(value||fallback||'Muc').replace(/[\\\/:*?"<>|#%{}]/g,'-').replace(/\s+/g,' ').trim()||fallback||'Muc').slice(0,90)}
 function formFolder_(base,formId,title,create){
-  const s=ensureStructure_(base,create);if(!s||!s.forms)return null;
-  let folder=findMarkedChild_(s.forms,formId);if(!folder&&create)folder=s.forms.createFolder(folderLabel_(title,'Biểu mẫu')+' '+marker_(formId));
-  if(folder&&create&&title){const desired=folderLabel_(title,'Biểu mẫu')+' '+marker_(formId);if(folder.getName()!==desired)try{folder.setName(desired)}catch(err){}}
+  const root=systemRoot_(base,create);if(!root)return null;let folder=findMarkedChild_(root,formId);if(!folder&&create)folder=root.createFolder(folderLabel_(title,'Bieu mau')+' '+marker_(formId));
+  if(folder&&create&&title){const desired=folderLabel_(title,'Bieu mau')+' '+marker_(formId);if(folder.getName()!==desired)try{folder.setName(desired)}catch(err){}}
   return folder;
 }
 function appFolder_(formHome,itemKey,meta,create){
-  const records=create?child_(formHome,FORM_RECORDS):findChild_(formHome,FORM_RECORDS);if(!records)return null;
-  let folder=findMarkedChild_(records,itemKey);if(!folder&&create)folder=records.createFolder(appFolderName_(meta,itemKey));
+  const records=create?child_(formHome,FORM_RECORDS):findChild_(formHome,FORM_RECORDS);if(!records)return null;let folder=findMarkedChild_(records,itemKey);
+  if(!folder&&create)folder=records.createFolder(appFolderName_(meta,itemKey));
   if(folder&&create){const desired=appFolderName_(meta,itemKey);if(folder.getName()!==desired)try{folder.setName(desired)}catch(err){}}
   return folder;
 }
-function appFolderName_(meta,itemKey){const identity=meta&&meta.identity||{},label=[meta&&meta.code||'',identity.studentName||identity.parentName||'Hồ sơ'].filter(Boolean).join(' - ');return folderLabel_(label,'Hồ sơ')+' '+marker_(itemKey)}
+function appFolderName_(meta,itemKey){const identity=meta&&meta.identity||{},label=[meta&&meta.code||'',identity.studentName||identity.parentName||'Ho so'].filter(Boolean).join(' - ');return folderLabel_(label,'Ho so')+' '+marker_(itemKey)}
 function readMeta_(folder){if(!folder)return null;const files=folder.getFilesByName('metadata.json');if(!files.hasNext())return null;try{return JSON.parse(files.next().getBlob().getDataAsString())}catch(err){return null}}
 function readPdf_(folder,name){if(!folder)return null;const wanted=fileName_(name||''),files=wanted?folder.getFilesByName(wanted):null;if(files&&files.hasNext())return files.next();const all=folder.getFiles();while(all.hasNext()){const file=all.next();if(/\.pdf$/i.test(file.getName()))return file}return null}
 function listHierarchy_(base,out){
-  const s=ensureStructure_(base,false);if(!s||!s.forms)return;
-  const forms=s.forms.getFolders();
+  const root=systemRoot_(base,false);if(!root)return;const forms=root.getFolders();
   while(forms.hasNext()){
     const home=forms.next(),formId=markedId_(home.getName()),source=findChild_(home,FORM_SOURCE),formMeta=readMeta_(source);
     if(formMeta)out.push({kind:'form',formId:String(formMeta.id||formId),formTitle:String(formMeta.title||home.getName()),itemKey:String(formMeta.id||formId),meta:formMeta});
-    const records=findChild_(home,FORM_RECORDS);if(!records)continue;
-    const apps=records.getFolders();
-    while(apps.hasNext()){
-      const item=apps.next(),meta=readMeta_(item);
-      if(meta)out.push({kind:'app',formId:String(meta.formId||formId),formTitle:String(meta.formTitle||(formMeta&&formMeta.title)||home.getName()),itemKey:String(meta.id||markedId_(item.getName())),meta:meta});
-    }
+    const records=findChild_(home,FORM_RECORDS);if(!records)continue;const apps=records.getFolders();
+    while(apps.hasNext()){const item=apps.next(),meta=readMeta_(item);if(meta)out.push({kind:'app',formId:String(meta.formId||formId),formTitle:String(meta.formTitle||formMeta&&formMeta.title||home.getName()),itemKey:String(meta.id||markedId_(item.getName())),meta:meta})}
   }
 }
 
-function adminFolderFromRoot_(rootUrl,create){
-  if(!rootUrl)return null;const base=folder_(rootUrl),s=ensureStructure_(base,create);return s&&s.admin||null;
-}
-function currentAdminFolder_(create){return adminFolderFromRoot_(String(PropertiesService.getScriptProperties().getProperty('SMARTFORMS_ADMIN_ROOT')||''),create)}
-function readAdminAuth_(){
-  const folder=currentAdminFolder_(false);if(!folder)return null;const files=folder.getFilesByName(ADMIN_FILE);if(!files.hasNext())return null;
-  try{const x=JSON.parse(files.next().getBlob().getDataAsString()||'{}');return normalizeAuth_(x)}catch(err){return null}
-}
-function normalizeAuth_(auth){
-  auth=auth||{};const p=auth.password&&typeof auth.password==='object'?auth.password:auth;
-  const clean={username:String(auth.username||'').trim(),hash:String(p.hash||auth.hash||''),salt:String(p.salt||auth.salt||''),it:Number(p.it||auth.it||180000)};
-  if(clean.username.length<3||clean.hash.length<20||clean.salt.length<8)return null;return clean;
-}
-function writeAdminAuth_(auth,rootUrl){
-  const clean=normalizeAuth_(auth);if(!clean)throw new Error('invalid admin auth');
-  const folder=adminFolderFromRoot_(rootUrl||String(PropertiesService.getScriptProperties().getProperty('SMARTFORMS_ADMIN_ROOT')||''),true);if(!folder)throw new Error('missing admin root');
-  const stored={username:clean.username,password:{algorithm:'PBKDF2-SHA256',hash:clean.hash,salt:clean.salt,it:clean.it},updatedAt:new Date().toISOString()};
-  upText_(folder,ADMIN_FILE,JSON.stringify(stored));return stored;
-}
-function adminAuthInfo_(){
-  const a=readAdminAuth_();if(!a)return{ok:true,apiVersion:API_VERSION,configured:false};
-  return{ok:true,apiVersion:API_VERSION,configured:true,username:a.username,salt:a.salt,it:a.it};
-}
-function adminBootstrap_(data,requestId){
-  const auth=typeof data.authJson==='string'?JSON.parse(data.authJson||'{}'):(data.auth||{}),root=String(data.rootFolderUrl||'');if(!root)throw new Error('missing admin root');
-  PropertiesService.getScriptProperties().setProperty('SMARTFORMS_ADMIN_ROOT',root);writeAdminAuth_(auth,root);
-  return requestText_(requestId,true,'admin configured',{configured:true,rootFolderUrl:root});
-}
-function adminLogin_(data,requestId){
-  const a=readAdminAuth_();if(!a)return requestText_(requestId,false,'admin not configured');
-  const username=String(data.username||'').trim(),hash=String(data.hash||'');if(username!==a.username||hash!==a.hash)return requestText_(requestId,false,'invalid admin credentials');
-  const session=Utilities.getUuid().replace(/-/g,'')+Utilities.getUuid().replace(/-/g,'');CacheService.getScriptCache().put('ADMIN_SESSION_'+session,'1',21600);
-  return requestText_(requestId,true,'logged in',{sessionToken:session,rootFolderUrl:String(PropertiesService.getScriptProperties().getProperty('SMARTFORMS_ADMIN_ROOT')||''),expiresIn:21600});
-}
-function adminConfig_(data,requestId){
-  const props=PropertiesService.getScriptProperties(),oldAuth=readAdminAuth_(),root=String(data.rootFolderUrl||props.getProperty('SMARTFORMS_ADMIN_ROOT')||'');if(root)props.setProperty('SMARTFORMS_ADMIN_ROOT',root);if(oldAuth&&root)writeAdminAuth_(oldAuth,root);
-  return requestText_(requestId,true,'admin config saved',{rootFolderUrl:root});
-}
-function adminAuthPut_(data,requestId){
-  const auth=typeof data.authJson==='string'?JSON.parse(data.authJson||'{}'):(data.auth||{});writeAdminAuth_(auth,'');
-  return requestText_(requestId,true,'admin auth saved',{updatedAt:new Date().toISOString()});
-}
-
-function publicFormMeta_(meta){
-  const copy=JSON.parse(JSON.stringify(meta||{}));
-  delete copy.driveHierarchyPath;delete copy.driveFolderUrl;delete copy.driveSyncError;delete copy.driveServiceAccount;
-  return copy;
-}
+function requireToken_(token){const expected=PropertiesService.getScriptProperties().getProperty('SMARTFORMS_DRIVE_TOKEN');if(!expected)throw new Error('Chua chay setupSmartFormsDrive');if(String(token||'')!==expected)throw new Error('unauthorized')}
 function publicConfig_(formId){const raw=PropertiesService.getScriptProperties().getProperty('PUBLIC_FORM_'+safe_(formId));if(!raw)return null;try{const cfg=JSON.parse(raw);return cfg&&cfg.enabled&&cfg.folderUrl?cfg:null}catch(err){return null}}
-function savePublicConfig_(meta,folderUrl){
-  if(!meta||!meta.id)return;const cfg={formId:String(meta.id),folderUrl:String(folderUrl||''),enabled:!!meta.published,title:String(meta.title||'Biểu mẫu'),description:String(meta.description||''),updatedAt:String(meta.updatedAt||new Date().toISOString()),createdAt:String(meta.createdAt||''),sectionCount:Array.isArray(meta.sections)?meta.sections.length:1,recognizerVersion:String(meta.recognizerVersion||'')};PropertiesService.getScriptProperties().setProperty('PUBLIC_FORM_'+safe_(meta.id),JSON.stringify(cfg));
-}
+function savePublicConfig_(meta,folderUrl){if(!meta||!meta.id)return;const cfg={formId:String(meta.id),folderUrl:String(folderUrl||''),enabled:!!meta.published,title:String(meta.title||'Bieu mau'),description:String(meta.description||''),updatedAt:String(meta.updatedAt||new Date().toISOString()),createdAt:String(meta.createdAt||''),sectionCount:Array.isArray(meta.sections)?meta.sections.length:1,recognizerVersion:String(meta.recognizerVersion||'')};PropertiesService.getScriptProperties().setProperty('PUBLIC_FORM_'+safe_(meta.id),JSON.stringify(cfg))}
 function publicCatalog_(){const all=PropertiesService.getScriptProperties().getProperties(),out=[];Object.keys(all).filter(function(k){return k.indexOf('PUBLIC_FORM_')===0}).forEach(function(k){try{const x=JSON.parse(all[k]);if(x.enabled&&x.folderUrl)out.push({id:x.formId,title:x.title,description:x.description,updatedAt:x.updatedAt,createdAt:x.createdAt,sectionCount:x.sectionCount,recognizerVersion:x.recognizerVersion})}catch(err){}});return out.sort(function(a,b){return String(b.updatedAt).localeCompare(String(a.updatedAt))})}
-function adminCatalog_(){const all=PropertiesService.getScriptProperties().getProperties(),out=[];Object.keys(all).filter(function(k){return k.indexOf('PUBLIC_FORM_')===0}).forEach(function(k){try{const x=JSON.parse(all[k]);if(x.folderUrl)out.push({formId:String(x.formId||k.slice(12)),folderUrl:String(x.folderUrl),enabled:!!x.enabled,title:String(x.title||'Biểu mẫu')})}catch(err){}});return out}
-
-function folderRef_(value){const raw=String(value||'').trim();let decoded=raw;try{decoded=decodeURIComponent(raw)}catch(err){}const match=decoded.match(/\/folders\/([-\w]{15,})/i)||decoded.match(/[?&]id=([-\w]{15,})/i)||decoded.match(/^([-\w]{15,})$/),id=(match||[])[1];if(!id)throw new Error('Link thư mục Drive không hợp lệ');const keyMatch=decoded.match(/[?&]resourcekey=([^&#]+)/i);let resourceKey='';if(keyMatch)try{resourceKey=decodeURIComponent(keyMatch[1])}catch(err){resourceKey=keyMatch[1]}return{id:id,resourceKey:resourceKey}}
+function adminCatalog_(){const all=PropertiesService.getScriptProperties().getProperties(),out=[];Object.keys(all).filter(function(k){return k.indexOf('PUBLIC_FORM_')===0}).forEach(function(k){try{const x=JSON.parse(all[k]);if(x.folderUrl)out.push({formId:String(x.formId||k.slice(12)),folderUrl:String(x.folderUrl),enabled:!!x.enabled,title:String(x.title||'Bieu mau')})}catch(err){}});return out}
+function folderRef_(value){const raw=String(value||'').trim();let decoded=raw;try{decoded=decodeURIComponent(raw)}catch(err){}const match=decoded.match(/\/folders\/([-\w]{15,})/i)||decoded.match(/[?&]id=([-\w]{15,})/i)||decoded.match(/^([-\w]{15,})$/),id=(match||[])[1];if(!id)throw new Error('Link thu muc Drive khong hop le');const keyMatch=decoded.match(/[?&]resourcekey=([^&#]+)/i);let resourceKey='';if(keyMatch)try{resourceKey=decodeURIComponent(keyMatch[1])}catch(err){resourceKey=keyMatch[1]}return{id:id,resourceKey:resourceKey}}
 function folder_(value){const ref=folderRef_(value);return ref.resourceKey?DriveApp.getFolderByIdAndResourceKey(ref.id,ref.resourceKey):DriveApp.getFolderById(ref.id)}
 function findChild_(parent,name){const found=parent.getFoldersByName(name);return found.hasNext()?found.next():null}
 function child_(parent,name){return findChild_(parent,name)||parent.createFolder(name)}
@@ -2092,18 +1988,15 @@ function requestKey_(value){const id=requestId_(value);return id?'REQUEST_'+id:'
 function requestText_(requestId,ok,message,data){const key=requestKey_(requestId);if(key)CacheService.getScriptCache().put(key,JSON.stringify({ok:!!ok,message:String(message||''),data:data||null,finishedAt:new Date().toISOString()}),600);return ContentService.createTextOutput(String(message||''))}
 function requestStatus_(requestId){const key=requestKey_(requestId);if(!key)return{ok:false,error:'invalid request id'};const raw=CacheService.getScriptCache().get(key);if(!raw)return{ok:true,pending:true};try{return{ok:true,pending:false,result:JSON.parse(raw)}}catch(err){return{ok:false,error:'invalid request status'}}}
 function jsonp_(callback,value){return ContentService.createTextOutput(callback+'('+JSON.stringify(value)+')').setMimeType(ContentService.MimeType.JAVASCRIPT)}
-function errorText_(err){return String(err&&err.message||err||'Lỗi Apps Script')}
-function requireMasterToken_(token){const expected=PropertiesService.getScriptProperties().getProperty('SMARTFORMS_DRIVE_TOKEN');if(!expected)throw new Error('Chưa chạy setupSmartFormsDrive');if(String(token||'')!==expected)throw new Error('unauthorized')}
-function requireToken_(token){const value=String(token||''),expected=PropertiesService.getScriptProperties().getProperty('SMARTFORMS_DRIVE_TOKEN');if(!expected)throw new Error('Chưa chạy setupSmartFormsDrive');if(value===expected)return true;if(value&&CacheService.getScriptCache().get('ADMIN_SESSION_'+value)==='1')return true;throw new Error('unauthorized')}
-
+function errorText_(err){return String(err&&err.message||err||'Loi Apps Script')}
 `;
 
  function driveHierarchyRoot(settings){let candidates=[settings?.folderUrl,...Object.values(settings?.formFolders||{})].filter(Boolean);for(let value of candidates)try{return normalizeDriveFolderUrl(value)}catch{}return''}
- function driveHierarchyError(error){let raw=String(error?.message||error||'Lỗi Google Drive.');if(/stale revision/i.test(raw))return'Drive đang có phiên bản hồ sơ mới hơn. Hãy lấy dữ liệu Drive về trước khi sửa tiếp.';if(/Drive Simple 9\.0|bản cũ|apiVersion/i.test(raw))return'Apps Script đang dùng bản cũ. Hãy sao chép mã Drive Simple 9.0, thay toàn bộ mã cũ và Deploy phiên bản mới.';return driveBridgeError(raw)}
- async function driveHierarchyHealth(root,{force=false}={}){let settings=await driveBridgeSettings(),cfg=assertDriveBridge(settings),folder=normalizeDriveFolderUrl(root||driveHierarchyRoot(settings));if(!folder)throw new Error('Chưa nhập thư mục mẹ Google Drive.');let key=cfg.endpoint+'|'+folder,cached=driveHealthCache.get(key);if(!force&&cached&&Date.now()-cached.checkedAt<DRIVE_HEALTH_CACHE_MS)return cached.value;let result=await jsonp(cfg.endpoint,{action:'driveHealth',token:cfg.token,folder},45000);if(!result.ok)throw new Error(result.error||'Không ghi được thư mục mẹ.');if(!String(result.apiVersion||'').includes('Drive Simple 9.0'))throw new Error('Apps Script đang là bản cũ.');driveHealthCache.set(key,{checkedAt:Date.now(),value:result});state.driveServiceAccount=result.serviceAccount||'';return result}
+ function driveHierarchyError(error){let raw=String(error?.message||error||'Lỗi Google Drive.');if(/stale revision/i.test(raw))return'Drive đang có phiên bản hồ sơ mới hơn. Hãy lấy dữ liệu Drive về trước khi sửa tiếp.';if(/Hierarchy 7\.0|bản cũ|apiVersion/i.test(raw))return'Apps Script đang dùng bản cũ. Hãy sao chép mã Drive Hierarchy 7.0, thay toàn bộ mã cũ và Deploy phiên bản mới.';return driveBridgeError(raw)}
+ async function driveHierarchyHealth(root,{force=false}={}){let settings=await driveBridgeSettings(),cfg=assertDriveBridge(settings),folder=normalizeDriveFolderUrl(root||driveHierarchyRoot(settings));if(!folder)throw new Error('Chưa nhập thư mục mẹ Google Drive.');let key=cfg.endpoint+'|'+folder,cached=driveHealthCache.get(key);if(!force&&cached&&Date.now()-cached.checkedAt<DRIVE_HEALTH_CACHE_MS)return cached.value;let result=await jsonp(cfg.endpoint,{action:'driveHealth',token:cfg.token,folder},45000);if(!result.ok)throw new Error(result.error||'Không ghi được thư mục mẹ.');if(!String(result.apiVersion||'').includes('Hierarchy 7.0'))throw new Error('Apps Script đang là bản cũ.');driveHealthCache.set(key,{checkedAt:Date.now(),value:result});state.driveServiceAccount=result.serviceAccount||'';return result}
  async function verifyDriveHierarchy(root,kind,formId,itemKey,pdfName){let settings=await driveBridgeSettings(),cfg=assertDriveBridge(settings),last='';for(let attempt=0;attempt<5;attempt++){if(attempt)await driveWait(450*(attempt+1));try{let result=await jsonp(cfg.endpoint,{action:'driveHas',token:cfg.token,folder:root,kind,formId,itemKey,pdfName},35000);if(result.ok&&result.exists)return result;last=result.error||'Chưa thấy file'}catch(error){last=error.message}}throw new Error(last||'Drive chưa xác nhận PDF mới nhất.')}
 
- bootstrapPublicService=async function(){let endpoint=await driveBridgeEndpoint();state.publicCatalog=[];state.publicServiceReady=false;state.publicServiceExpected=!!endpoint;state.publicServiceError='';if(!endpoint)return false;try{let result=await jsonp(endpoint,{action:'publicCatalog'},35000);if(!result.ok||!String(result.apiVersion||'').includes('Drive Simple 9.0'))throw new Error(result.error||'Apps Script chưa dùng Drive Simple 9.0.');state.publicCatalog=Array.isArray(result.forms)?result.forms:[];state.publicServiceReady=true;return true}catch(error){state.publicServiceError=error.message;return false}};
+ bootstrapPublicService=async function(){let endpoint=await driveBridgeEndpoint();state.publicCatalog=[];state.publicServiceReady=false;state.publicServiceExpected=!!endpoint;state.publicServiceError='';if(!endpoint)return false;try{let result=await jsonp(endpoint,{action:'publicCatalog'},35000);if(!result.ok||!String(result.apiVersion||'').includes('Hierarchy 7.0'))throw new Error(result.error||'Apps Script chưa dùng Drive Hierarchy 7.0.');state.publicCatalog=Array.isArray(result.forms)?result.forms:[];state.publicServiceReady=true;return true}catch(error){state.publicServiceError=error.message;return false}};
  loadPublicForm=async function(formId){let endpoint=await driveBridgeEndpoint();if(!endpoint)throw new Error('Thiếu URL Apps Script. Hãy mở đúng link phụ huynh do Admin cung cấp.');let result=await jsonp(endpoint,{action:'publicForm',formId},65000);if(!result.ok||!result.form||!result.pdfBase64)throw new Error(result.error||'Không tải được biểu mẫu công khai.');let form={...result.form,pdfBuffer:base64ToArrayBuffer(result.pdfBase64),remoteSource:true};await idbPut('forms',form);return form};
 
  syncFormToDrive=async function(form,silent=false,force=false,throwOnError=false){let fail=value=>{let error=new Error(driveHierarchyError(value));if(!silent)alert(error.message);if(throwOnError)throw error;return false};try{let settings=await driveBridgeSettings();if(!force&&settings.autoForms===false)return false;let cfg=assertDriveBridge(settings),root=driveHierarchyRoot(settings);if(!root)throw new Error('Chưa nhập thư mục mẹ Google Drive.');if(!bufferAlive(form.pdfBuffer))throw new Error('PDF biểu mẫu không hợp lệ.');await driveHierarchyHealth(root);let {pdfBuffer,...meta}=form,name=`BIỂU MẪU - ${driveFilePart(form.title)}.pdf`,marker=driveRequestId();meta.driveRootFolderUrl=root;meta._drivePdfName=name;await bridgePostConfirmed({action:'driveSync',folder:root,kind:'form',formId:form.id,formTitle:form.title,itemKey:form.id,metaJson:JSON.stringify(meta),pdfBase64:await arrayBufferToBase64Async(form.pdfBuffer),pdfName:name,requestId:marker},150000);await verifyDriveHierarchy(root,'form',form.id,form.id,name);form.driveFolderUrl=root;form.publicDriveRegisteredAt=form.published?nowISO():'';await idbPut('forms',form);if(!silent)alert('Đã cập nhật biểu mẫu vào đúng mục con trên Drive.');return true}catch(error){return fail(error)}};
@@ -2120,10 +2013,9 @@ function requireToken_(token){const value=String(token||''),expected=PropertiesS
 
  async function renderDriveHierarchy(){
    let settings=await driveBridgeSettings(),cfg=driveBridgeConfig(settings),root=driveHierarchyRoot(settings),forms=await idbAll('forms'),apps=await idbAll('apps'),configured=validDriveBridgeUrl(cfg.endpoint)&&!!cfg.token&&!!root,parentLink=validDriveBridgeUrl(cfg.endpoint)?publicShareUrl(cfg.endpoint):'';
-   $('#av-drive').innerHTML=`<div class="sectionHead"><div><h2>Google Drive phân cấp</h2><p>Một thư mục mẹ; hệ thống tự tạo mục con cho từng biểu mẫu và từng mã hồ sơ.</p></div></div><div class="card panel"><div class="notice ${configured?'ok':'warn'}">${configured?'<b>Drive đã sẵn sàng.</b> Hồ sơ sửa lại sẽ thay đúng PDF hiện tại, không tạo file trùng.':'Nhập Apps Script, token và link thư mục mẹ để bắt đầu.'}</div><div class="section-box" style="margin-top:14px;background:#f8fbff"><b>Cấu trúc được tạo tự động</b><div style="margin-top:10px;line-height:1.8;color:#4e5d74;font-size:12px">📁 <b>Thư mục mẹ Admin chọn</b><br>　└─ 📁 ST SmartForms - Hồ sơ hành chính<br>　　　└─ 📁 Tên loại biểu mẫu <span class="muted">[mục mẹ]</span><br>　　　　　├─ 📁 01 - Biểu mẫu gốc<br>　　　　　└─ 📁 02 - Hồ sơ đã tiếp nhận<br>　　　　　　　└─ 📁 Mã hồ sơ - Họ tên <span class="muted">[mục con]</span><br>　　　　　　　　　├─ metadata.json<br>　　　　　　　　　└─ PDF hiện hành</div></div><form id="driveHierarchyCfg" class="formgrid" style="margin-top:16px"><div class="field full"><label>1. URL Web App Apps Script</label><input name="appsScriptUrl" value="${esc(cfg.endpoint)}" placeholder="https://script.google.com/macros/s/.../exec" required></div><div class="field full"><label>2. SMARTFORMS_DRIVE_TOKEN</label><input name="appsScriptToken" type="password" value="${esc(cfg.token)}" autocomplete="off" required></div><div class="field full"><label>3. Link thư mục mẹ Google Drive</label><div class="drive-link-row"><input name="folderUrl" value="${esc(root)}" placeholder="https://drive.google.com/drive/folders/..." required><a class="btn secondary btn-link ${root?'':'hidden'}" href="${esc(root||'#')}" target="_blank" rel="noopener">Mở Drive ↗</a></div></div><div class="field"><label style="display:flex;gap:8px;align-items:center"><input name="autoForms" type="checkbox" style="width:auto" ${settings.autoForms!==false?'checked':''}> Tự lưu biểu mẫu</label></div><div class="field"><label style="display:flex;gap:8px;align-items:center"><input name="autoApps" type="checkbox" style="width:auto" ${settings.autoApps!==false?'checked':''}> Tự thay PDF hồ sơ</label></div><div class="field full"><button class="btn primary">Lưu cấu hình & tạo phân luồng</button></div></form><div class="actions" style="margin-top:15px"><button class="btn secondary" id="driveHierarchyTest">Kiểm tra Drive</button><button class="btn secondary" id="driveHierarchySync">Đồng bộ toàn bộ</button><button class="btn secondary" id="driveHierarchyPull">Lấy dữ liệu Drive về</button></div><div id="driveProgress" style="margin-top:12px"></div>${parentLink?`<div class="section-box" style="margin-top:18px"><b>Link chính thức gửi phụ huynh</b><div class="drive-link-row" style="margin-top:9px"><input id="publicParentLink" readonly value="${esc(parentLink)}"><button class="btn secondary" id="copyParentLink" type="button">Sao chép</button></div></div>`:''}<div class="section-box" style="margin-top:18px"><b>Dữ liệu hiện có</b><div class="muted" style="margin-top:6px">${forms.length} loại biểu mẫu · ${apps.length} hồ sơ · cập nhật theo cùng mã hồ sơ.</div></div><details style="margin-top:14px"><summary><b>Mã Apps Script Drive Simple 9.0</b></summary><div class="setup-guide"><b>Cập nhật bắt buộc một lần:</b> thay toàn bộ mã Drive cũ bằng mã Simple 9.0 → chạy <b>setupSmartFormsDrive</b> → Deploy → Manage deployments → Edit → New version → Deploy; chọn <b>Execute as: Me</b> và <b>Who has access: Anyone</b>. Sau đó dán URL /exec và token vào đây.</div><textarea id="driveHierarchyCode" readonly spellcheck="false" style="min-height:390px;font-family:Consolas,Monaco,monospace;font-size:11px;line-height:1.45;margin-top:10px"></textarea><button class="btn secondary" id="copyDriveHierarchyCode" type="button">Sao chép mã Drive Simple 9.0</button></details></div>`;
-   let endpointInput=$('#driveSimpleCfg [name="appsScriptUrl"]');if(endpointInput)endpointInput.addEventListener('change',()=>{let url=normalizeDriveBridgeUrl(endpointInput.value);if(url){BUILTIN_PUBLIC_ENDPOINT=url;rememberPublicEndpoint(url);try{localStorage.setItem(DRIVE_BRIDGE_URL_KEY,url)}catch{}}});
-  $('#driveHierarchyCode').value=DRIVE_HIERARCHY_APPS_SCRIPT;
-   $('#copyDriveHierarchyCode').onclick=async()=>{let button=$('#copyDriveHierarchyCode'),ok=await copyEmbeddedText(DRIVE_HIERARCHY_APPS_SCRIPT);button.textContent=ok?'Đã sao chép':'Không sao chép được';setTimeout(()=>{if(button)button.textContent='Sao chép mã Drive Simple 9.0'},1800)};
+   $('#av-drive').innerHTML=`<div class="sectionHead"><div><h2>Google Drive phân cấp</h2><p>Một thư mục mẹ; hệ thống tự tạo mục con cho từng biểu mẫu và từng mã hồ sơ.</p></div></div><div class="card panel"><div class="notice ${configured?'ok':'warn'}">${configured?'<b>Drive đã sẵn sàng.</b> Hồ sơ sửa lại sẽ thay đúng PDF hiện tại, không tạo file trùng.':'Nhập Apps Script, token và link thư mục mẹ để bắt đầu.'}</div><div class="section-box" style="margin-top:14px;background:#f8fbff"><b>Cấu trúc được tạo tự động</b><div style="margin-top:10px;line-height:1.8;color:#4e5d74;font-size:12px">📁 <b>Thư mục mẹ Admin chọn</b><br>　└─ 📁 ST SmartForms - Hồ sơ hành chính<br>　　　└─ 📁 Tên loại biểu mẫu <span class="muted">[mục mẹ]</span><br>　　　　　├─ 📁 01 - Biểu mẫu gốc<br>　　　　　└─ 📁 02 - Hồ sơ đã tiếp nhận<br>　　　　　　　└─ 📁 Mã hồ sơ - Họ tên <span class="muted">[mục con]</span><br>　　　　　　　　　├─ metadata.json<br>　　　　　　　　　└─ PDF hiện hành</div></div><form id="driveHierarchyCfg" class="formgrid" style="margin-top:16px"><div class="field full"><label>1. URL Web App Apps Script</label><input name="appsScriptUrl" value="${esc(cfg.endpoint)}" placeholder="https://script.google.com/macros/s/.../exec" required></div><div class="field full"><label>2. SMARTFORMS_DRIVE_TOKEN</label><input name="appsScriptToken" type="password" value="${esc(cfg.token)}" autocomplete="off" required></div><div class="field full"><label>3. Link thư mục mẹ Google Drive</label><div class="drive-link-row"><input name="folderUrl" value="${esc(root)}" placeholder="https://drive.google.com/drive/folders/..." required><a class="btn secondary btn-link ${root?'':'hidden'}" href="${esc(root||'#')}" target="_blank" rel="noopener">Mở Drive ↗</a></div></div><div class="field"><label style="display:flex;gap:8px;align-items:center"><input name="autoForms" type="checkbox" style="width:auto" ${settings.autoForms!==false?'checked':''}> Tự lưu biểu mẫu</label></div><div class="field"><label style="display:flex;gap:8px;align-items:center"><input name="autoApps" type="checkbox" style="width:auto" ${settings.autoApps!==false?'checked':''}> Tự thay PDF hồ sơ</label></div><div class="field full"><button class="btn primary">Lưu cấu hình & tạo phân luồng</button></div></form><div class="actions" style="margin-top:15px"><button class="btn secondary" id="driveHierarchyTest">Kiểm tra Drive</button><button class="btn secondary" id="driveHierarchySync">Đồng bộ toàn bộ</button><button class="btn secondary" id="driveHierarchyPull">Lấy dữ liệu Drive về</button></div><div id="driveProgress" style="margin-top:12px"></div>${parentLink?`<div class="section-box" style="margin-top:18px"><b>Link chính thức gửi phụ huynh</b><div class="drive-link-row" style="margin-top:9px"><input id="publicParentLink" readonly value="${esc(parentLink)}"><button class="btn secondary" id="copyParentLink" type="button">Sao chép</button></div></div>`:''}<div class="section-box" style="margin-top:18px"><b>Dữ liệu hiện có</b><div class="muted" style="margin-top:6px">${forms.length} loại biểu mẫu · ${apps.length} hồ sơ · cập nhật theo cùng mã hồ sơ.</div></div><details style="margin-top:14px"><summary><b>Mã Apps Script Drive Hierarchy 7.0</b></summary><div class="setup-guide"><b>Cập nhật bắt buộc một lần:</b> thay toàn bộ mã Drive cũ bằng mã 7.0 → chạy <b>setupSmartFormsDrive</b> → Deploy → Manage deployments → Edit → New version → Deploy. Sau đó dán URL /exec và token vào đây.</div><textarea id="driveHierarchyCode" readonly spellcheck="false" style="min-height:390px;font-family:Consolas,Monaco,monospace;font-size:11px;line-height:1.45;margin-top:10px"></textarea><button class="btn secondary" id="copyDriveHierarchyCode" type="button">Sao chép mã Drive 7.0</button></details></div>`;
+   $('#driveHierarchyCode').value=DRIVE_HIERARCHY_APPS_SCRIPT;
+   $('#copyDriveHierarchyCode').onclick=async()=>{let button=$('#copyDriveHierarchyCode'),ok=await copyEmbeddedText(DRIVE_HIERARCHY_APPS_SCRIPT);button.textContent=ok?'Đã sao chép':'Không sao chép được';setTimeout(()=>{if(button)button.textContent='Sao chép mã Drive 7.0'},1800)};
    $('#driveHierarchyCfg').onsubmit=async event=>{event.preventDefault();let data=collectForm(event.target),box=$('#driveProgress'),button=event.submitter||event.target.querySelector('button');button.disabled=true;button.textContent='Đang tạo phân luồng…';try{let folder=normalizeDriveFolderUrl(data.folderUrl),url=normalizeDriveBridgeUrl(data.appsScriptUrl),token=data.appsScriptToken.trim();assertDriveBridge({appsScriptUrl:url,appsScriptToken:token});await saveGatewayLocal({folderUrl:folder,formFolders:{},appsScriptUrl:url,appsScriptToken:token,autoForms:event.target.autoForms.checked,autoApps:event.target.autoApps.checked});for(let form of forms){form.driveFolderUrl=folder;await idbPut('forms',form)}await driveHierarchyHealth(folder,{force:true});await syncAllDriveHierarchy();await bootstrapPublicService();button.textContent='Đã lưu & tạo phân luồng';box.innerHTML='<div class="notice ok">Đã tạo cây thư mục và đồng bộ. Từ giờ bản sửa sẽ thay PDF hiện hành của đúng mã hồ sơ.</div>';setTimeout(()=>renderDriveHierarchy(),900)}catch(error){button.disabled=false;button.textContent='Lưu cấu hình & tạo phân luồng';box.innerHTML=`<div class="notice bad">${esc(driveHierarchyError(error))}</div>`}};
    $('#driveHierarchyTest').onclick=async()=>{let box=$('#driveProgress');box.innerHTML='<div class="notice">Đang kiểm tra quyền ghi…</div>';try{let result=await driveHierarchyHealth(root,{force:true});box.innerHTML=`<div class="notice ok">Kết nối thành công: <b>${esc(result.folderName)}</b>. Đã sẵn sàng tạo mục mẹ và mục con.</div>`}catch(error){box.innerHTML=`<div class="notice bad">${esc(driveHierarchyError(error))}</div>`}};
    $('#driveHierarchySync').onclick=syncAllDriveHierarchy;
@@ -2156,266 +2048,11 @@ function requireToken_(token){const value=String(token||''),expected=PropertiesS
 
  showAdminView=function(view){let allowed=['dashboard','forms','records','drive','gmail','settings'];if(!allowed.includes(view))view='dashboard';writeUiSession({adminView:view});$$('.sidebtn[data-av]').forEach(button=>button.classList.toggle('active',button.dataset.av===view));for(let name of allowed){let pane=$('#av-'+name);if(pane)pane.classList.toggle('hidden',name!==view)}({dashboard:renderDashboard,forms:renderAdminForms,records:renderRecords,drive:renderDriveHierarchy,gmail:renderGmail,settings:renderSettings}[view])()};
  (function installDriveNavigationAndStyles(){let sidebar=$('#page-admin .sidebar');if(sidebar&&!sidebar.querySelector('[data-av="drive"]')){let button=document.createElement('button');button.className='sidebtn';button.dataset.av='drive';button.textContent='Google Drive';button.onclick=()=>showAdminView('drive');let gmail=sidebar.querySelector('[data-av="gmail"]');sidebar.insertBefore(button,gmail||sidebar.lastElementChild)}if(!$('#driveHierarchyStyle')){let style=document.createElement('style');style.id='driveHierarchyStyle';style.textContent='.record-parent{border:1px solid var(--line);background:#fbfcff}.record-parent>summary{padding:13px 15px}.record-parent>summary::after{margin-top:10px}.record-parent[open]>summary{background:linear-gradient(135deg,#edf3ff,#f4faf8)}@media(max-width:620px){.record-parent .student-records{padding:9px!important}.student-foot{align-items:stretch;flex-direction:column}.student-foot .actions{width:100%}.student-foot .actions .btn{flex:1}}';document.head.appendChild(style)}})();
-
-
-  /* ===== Shared Admin 8.0 + Parent-only link ===== */
-  const SHARED_ADMIN_SESSION_KEY='st_smartforms_shared_admin_session_v1';
-  const SHORT_SERVICE_PARAM='sf',PARENT_MODE_PARAM='ph';
-  state.sharedPulling=false;state.sharedSyncGuard=false;state.sharedAuxSyncGuard=false;state.sharedLastPull=0;
-
-  function serviceDeploymentId(endpoint){try{return String(endpoint||'').match(/\/s\/([-\w]+)\/exec/i)?.[1]||''}catch{return''}}
-  function endpointFromDeploymentId(id){id=String(id||'').trim();return /^[-\w]{20,}$/.test(id)?`https://script.google.com/macros/s/${id}/exec`:''}
-  function isParentOnlyMode(){try{let u=new URL(location.href);return u.searchParams.get(PARENT_MODE_PARAM)==='1'||u.searchParams.get('mode')==='parent'}catch{return false}}
-
-  driveBridgeEndpoint=async function(){
-    let fromUrl='';try{let u=new URL(location.href),direct=u.searchParams.get(PUBLIC_ENDPOINT_PARAM)||'',short=u.searchParams.get(SHORT_SERVICE_PARAM)||'';fromUrl=normalizeDriveBridgeUrl(direct)||normalizeDriveBridgeUrl(endpointFromDeploymentId(short))}catch{}
-    let endpoint=fromUrl||normalizeDriveBridgeUrl(BUILTIN_PUBLIC_ENDPOINT)||normalizeDriveBridgeUrl(state.publicEndpoint);
-    if(!endpoint)try{endpoint=normalizeDriveBridgeUrl(localStorage.getItem(DRIVE_BRIDGE_URL_KEY)||'')}catch{}
-    if(!endpoint){let d=await driveBridgeSettings();endpoint=normalizeDriveBridgeUrl(d.appsScriptUrl)}
-    if(endpoint){state.publicEndpoint=endpoint;try{localStorage.setItem(DRIVE_BRIDGE_URL_KEY,endpoint);localStorage.setItem(PUBLIC_ENDPOINT_KEY,endpoint)}catch{}}
-    return endpoint
-  };
-  publicServiceEndpoint=driveBridgeEndpoint;
-  publicShareUrl=function(endpoint,baseUrl=''){endpoint=normalizeDriveBridgeUrl(endpoint);if(!endpoint)return'';let base=normalizePublicSiteUrl(baseUrl)||currentHostedSiteUrl()||location.href,u=new URL(base),id=serviceDeploymentId(endpoint),builtIn=normalizeDriveBridgeUrl(BUILTIN_PUBLIC_ENDPOINT);u.search='';u.hash='';u.searchParams.set(PARENT_MODE_PARAM,'1');if(endpoint!==builtIn){if(id)u.searchParams.set(SHORT_SERVICE_PARAM,id);else u.searchParams.set(PUBLIC_ENDPOINT_PARAM,endpoint)}return u.toString()};
-
-  function applyParentOnlyMode(){
-    if(!isParentOnlyMode())return false;
-    document.documentElement.dataset.parentMode='1';
-    let adminNav=document.querySelector('.navbtn[data-page="admin"]');if(adminNav)adminNav.remove();
-    let adminPage=document.getElementById('page-admin');if(adminPage)adminPage.remove();
-    try{sessionStorage.removeItem(ADMIN_SESSION_KEY);sessionStorage.removeItem(SHARED_ADMIN_SESSION_KEY)}catch{}
-    state.admin=false;
-    return true
-  }
-
-  const goPageSharedBase=goPage;
-  goPage=function(page,options={}){if(isParentOnlyMode()&&page==='admin')page='home';return goPageSharedBase(page,options)};
-  restoreUiSession=function(){let ui=readUiSession(),page=isParentOnlyMode()?'home':(['home','lookup','admin'].includes(ui.page)?ui.page:'home');goPage(page,{restore:true})};
-
-  async function sharedAdminEndpoint(){return await driveBridgeEndpoint()}
-  async function sharedAdminInfo(endpoint){if(!endpoint)return{ok:false,configured:false};let r=await jsonp(endpoint,{action:'adminAuthInfo'},25000);return r||{ok:false,configured:false}}
-  async function sharedAdminPost(endpoint,payload,timeout=60000){
-    let requestId=driveRequestId(),started=Date.now();
-    await fetch(endpoint,{method:'POST',mode:'no-cors',cache:'no-store',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({...payload,requestId})});
-    for(let attempt=0;Date.now()-started<timeout;attempt++){
-      if(attempt)await driveWait(Math.min(350+attempt*350,1800));
-      let s=await jsonp(endpoint,{action:'publicRequestStatus',requestId},25000);
-      if(!s.ok||s.pending)continue;
-      if(s.result?.ok)return s.result;
-      throw new Error(s.result?.message||'Không xác thực được Admin.')
-    }
-    throw new Error('Máy chủ chưa xác nhận đăng nhập Admin.')
-  }
-  function localAdminRecord(){try{return JSON.parse(localStorage.getItem('st_pdf_admin')||'{}')}catch{return{}}}
-  async function bootstrapSharedAdminIfPossible(){
-    let endpoint=await sharedAdminEndpoint(),settings=await driveBridgeSettings(),auth=localAdminRecord(),master=String(settings.appsScriptToken||'').trim(),root=driveHierarchyRoot(settings);
-    if(!endpoint||!master||!auth.username||!auth.hash||!auth.salt)return false;
-    try{let info=await sharedAdminInfo(endpoint);if(info.configured){if(root)try{await sharedAdminPost(endpoint,{action:'adminConfig',token:master,rootFolderUrl:root},45000)}catch{}return true}
-      await sharedAdminPost(endpoint,{action:'adminBootstrap',token:master,authJson:JSON.stringify(auth),rootFolderUrl:root},60000);return true
-    }catch(error){console.warn('Shared admin bootstrap:',error);return false}
-  }
-  async function saveSharedAdminSession(endpoint,result){
-    let current=await gatewaySettings(),root=result.data?.rootFolderUrl||result.rootFolderUrl||driveHierarchyRoot(current),token=result.data?.sessionToken||result.sessionToken||'';
-    if(!token)throw new Error('Máy chủ chưa cấp phiên đăng nhập.');
-    await saveGatewayLocal({appsScriptUrl:endpoint,appsScriptToken:token,folderUrl:root||current.folderUrl||'',formFolders:{},autoForms:true,autoApps:true});
-    state.publicEndpoint=endpoint;state.admin=true;try{sessionStorage.setItem(SHARED_ADMIN_SESSION_KEY,token);sessionStorage.setItem(ADMIN_SESSION_KEY,'1')}catch{}
-  }
-  async function pullSharedAuxState(){
-    let d=await driveBridgeSettings(),endpoint=normalizeDriveBridgeUrl(d.appsScriptUrl),token=String(d.appsScriptToken||'').trim();if(!endpoint||!token)return false;
-    let result=await jsonp(endpoint,{action:'adminStateGet',token},45000);if(!result.ok)return false;let remote=result.state||{},settings=Array.isArray(remote.settings)?remote.settings:[],emails=Array.isArray(remote.emails)?remote.emails:[];
-    state.sharedAuxSyncGuard=true;
-    try{
-      for(let item of settings){if(!item||!item.id)continue;let next={...item};if(item.id==='drive'){let current=await gatewaySettings();next={...item,id:'drive',appsScriptUrl:endpoint,appsScriptToken:token,folderUrl:d.folderUrl||item.folderUrl||'',formFolders:{...(item.formFolders||{}),...(d.formFolders||{})}}}await sharedIdbPutBase('settings',next)}
-      for(let item of emails){if(item&&item.id)await sharedIdbPutBase('emails',item)}
-      return true
-    }finally{state.sharedAuxSyncGuard=false}
-  }
-  async function pushSharedAuxState(){
-    if(!state.admin||state.sharedPulling||state.sharedAuxSyncGuard||isParentOnlyMode())return false;
-    let d=await driveBridgeSettings(),endpoint=normalizeDriveBridgeUrl(d.appsScriptUrl),token=String(d.appsScriptToken||'').trim(),root=driveHierarchyRoot(d);if(!endpoint||!token||!root)return false;
-    let settings=(await idbAll('settings')).map(item=>item?.id==='drive'?{...item,appsScriptToken:''}:item),emails=await idbAll('emails');
-    try{await sharedAdminPost(endpoint,{action:'adminStatePut',token,stateJson:JSON.stringify({settings,emails,updatedAt:nowISO()})},60000);return true}catch(error){console.warn('Shared admin auxiliary sync:',error);return false}
-  }
-  async function refreshSharedAdminData(force=false){
-    if(!state.admin||state.sharedPulling||isParentOnlyMode())return false;
-    if(!force&&Date.now()-Number(state.sharedLastPull||0)<15000)return false;
-    let d=await driveBridgeSettings();if(!validDriveBridgeUrl(d.appsScriptUrl)||!d.appsScriptToken||!driveHierarchyRoot(d))return false;
-    state.sharedPulling=true;
-    try{await pullDriveHierarchy();await pullSharedAuxState();state.sharedLastPull=Date.now();return true}catch(error){console.warn('Shared admin pull:',error);return false}finally{state.sharedPulling=false}
-  }
-
-  renderAdminGate=async function(){
-    if(isParentOnlyMode())return goPage('home');
-    if(state.admin){$('#adminGate').classList.add('hidden');$('#adminApp').classList.remove('hidden');await refreshSharedAdminData(false);let view=readUiSession().adminView;showAdminView(ADMIN_VIEWS.includes(view)?view:'dashboard');return}
-    $('#adminApp').classList.add('hidden');$('#adminGate').classList.remove('hidden');
-    let endpoint=await sharedAdminEndpoint(),info=null;
-    if(endpoint)try{info=await sharedAdminInfo(endpoint)}catch(error){info={ok:false,configured:false,error:error.message}}
-    if(info?.configured){
-      $('#adminGate').innerHTML=`<div class="card panel" style="max-width:500px;margin:35px auto"><h2>Đăng nhập quản trị</h2><p class="muted">Tài khoản này dùng chung cho mọi thiết bị và trình duyệt.</p><form id="sharedLoginAdmin" style="display:grid;gap:12px"><div class="field"><label>Tên đăng nhập</label><input name="username" required autocomplete="username"></div><div class="field"><label>Mật khẩu</label><input type="password" name="password" required autocomplete="current-password"></div><button class="btn primary">Đăng nhập</button></form><div id="sharedLoginStatus" style="margin-top:12px"></div></div>`;
-      $('#sharedLoginAdmin').onsubmit=async e=>{e.preventDefault();let button=e.submitter||e.target.querySelector('button'),box=$('#sharedLoginStatus'),data=collectForm(e.target);button.disabled=true;button.textContent='Đang xác thực…';try{let hash=await passwordHash(data.password,info.salt,info.it||180000),result=await sharedAdminPost(endpoint,{action:'adminLogin',username:data.username,hash},60000);try{localStorage.setItem('st_pdf_admin',JSON.stringify({username:data.username,hash,salt:info.salt,it:info.it||180000}))}catch{}await saveSharedAdminSession(endpoint,result);box.innerHTML='<div class="notice ok">Đăng nhập thành công. Đang lấy dữ liệu Admin mới nhất…</div>';await refreshSharedAdminData(true);await renderAdminGate()}catch(error){button.disabled=false;button.textContent='Đăng nhập';box.innerHTML=`<div class="notice bad">${esc(/invalid admin credentials/i.test(error.message)?'Thông tin đăng nhập không đúng.':error.message)}</div>`}};
-      return
-    }
-    // Chưa có tài khoản dùng chung: giữ tương thích tài khoản local hiện tại để khởi tạo lần đầu.
-    if(!authExists()){
-      $('#adminGate').innerHTML=`<div class="card panel" style="max-width:560px;margin:35px auto"><h2>Thiết lập quản trị lần đầu</h2><div class="notice warn">Tạo tài khoản ở thiết bị này trước. Khi cấu hình Apps Script/Drive, hệ thống sẽ tự đưa tài khoản lên chế độ dùng chung.</div><form id="setupAdminShared" class="formgrid" style="margin-top:14px"><div class="field full"><label>Tên đăng nhập</label><input name="username" required minlength="3"></div><div class="field"><label>Mật khẩu</label><input type="password" name="password" required minlength="8"></div><div class="field"><label>Nhập lại mật khẩu</label><input type="password" name="password2" required minlength="8"></div><div class="field full"><button class="btn primary">Tạo tài khoản</button></div></form></div>`;
-      $('#setupAdminShared').onsubmit=async e=>{e.preventDefault();let d=collectForm(e.target);if(d.password!==d.password2)return alert('Hai mật khẩu không khớp.');let salt=arrayBufferToBase64(crypto.getRandomValues(new Uint8Array(16)).buffer),hash=await passwordHash(d.password,salt),auth={username:d.username,salt,hash,it:180000};localStorage.setItem('st_pdf_admin',JSON.stringify(auth));state.admin=true;await bootstrapSharedAdminIfPossible();renderAdminGate()};return
-    }
-    $('#adminGate').innerHTML=`<div class="card panel" style="max-width:500px;margin:35px auto"><h2>Đăng nhập quản trị</h2>${endpoint?'<div class="notice warn">Dịch vụ dùng chung chưa được khởi tạo. Đăng nhập bằng tài khoản hiện tại, sau đó vào Google Drive để hoàn tất cấu hình một lần.</div>':'<div class="notice warn"><b>Chưa gắn URL dịch vụ cố định.</b> Trên máy mới, link gốc GitHub chỉ có thể tự đăng nhập khi URL Apps Script đã được đặt trong hằng <code>BUILTIN_PUBLIC_ENDPOINT</code> của file trước khi đưa lên GitHub.</div>'}<form id="localLoginAdmin" style="display:grid;gap:12px;margin-top:14px"><div class="field"><label>Tên đăng nhập</label><input name="username" required></div><div class="field"><label>Mật khẩu</label><input type="password" name="password" required></div><button class="btn primary">Đăng nhập</button></form></div>`;
-    $('#localLoginAdmin').onsubmit=async e=>{e.preventDefault();let d=collectForm(e.target),x=localAdminRecord(),hash=await passwordHash(d.password,x.salt,x.it||180000);if(d.username===x.username&&hash===x.hash){state.admin=true;await bootstrapSharedAdminIfPossible();renderAdminGate()}else alert('Thông tin đăng nhập không đúng.')}
-  };
-  logoutAdmin=function(){state.admin=false;try{sessionStorage.removeItem(ADMIN_SESSION_KEY);sessionStorage.removeItem(SHARED_ADMIN_SESSION_KEY)}catch{}renderAdminGate()};
-
-  // Tất cả thay đổi form/hồ sơ trong Admin được đẩy lên nguồn chung theo cơ chế debounce.
-  const sharedIdbPutBase=idbPut,sharedSyncTimers=new Map();
-  idbPut=async function(store,value){let result=await sharedIdbPutBase(store,value);if(state.admin&&!state.sharedPulling&&!state.sharedSyncGuard&&(store==='forms'||store==='apps')&&value?.id){let key=store+':'+value.id,old=sharedSyncTimers.get(key);if(old)clearTimeout(old);sharedSyncTimers.set(key,setTimeout(async()=>{sharedSyncTimers.delete(key);state.sharedSyncGuard=true;try{let latest=await idbGet(store,value.id);if(latest){if(store==='forms')await syncFormToDrive(latest,true,true,true);else await syncAppToDrive(latest,true,true,true)}}catch(error){console.warn('Shared admin sync:',error)}finally{state.sharedSyncGuard=false}},700))}if(state.admin&&!state.sharedPulling&&!state.sharedAuxSyncGuard&&(store==='settings'||store==='emails')){let key='aux-state',old=sharedSyncTimers.get(key);if(old)clearTimeout(old);sharedSyncTimers.set(key,setTimeout(async()=>{sharedSyncTimers.delete(key);await pushSharedAuxState()},1000))}return result};
-
-  const renderDriveHierarchySharedBase=renderDriveHierarchy;
-  renderDriveHierarchy=async function(){
-    await renderDriveHierarchySharedBase();
-    let form=$('#driveHierarchyCfg');if(form&&form.onsubmit){let old=form.onsubmit;form.onsubmit=async function(event){await old.call(this,event);await bootstrapSharedAdminIfPossible();let settings=await driveBridgeSettings(),endpoint=normalizeDriveBridgeUrl(settings.appsScriptUrl),root=driveHierarchyRoot(settings);if(endpoint&&settings.appsScriptToken&&root)try{await sharedAdminPost(endpoint,{action:'adminConfig',token:settings.appsScriptToken,rootFolderUrl:root},45000);await pushSharedAuxState()}catch{}}}
-    let panel=$('#av-drive .card.panel');if(panel&&!$('#sharedAdminDeployNote')){let endpoint=await sharedAdminEndpoint(),section=document.createElement('div');section.id='sharedAdminDeployNote';section.className='section-box';section.style.marginTop='18px';section.innerHTML=`<b>Admin dùng chung trên mọi thiết bị</b><div class="field-hint" style="margin-top:8px">Để <b>link gốc GitHub</b> tự biết máy chủ ngay cả trên trình duyệt mới, trước khi đưa file lên GitHub hãy đặt URL Apps Script vào hằng <code>BUILTIN_PUBLIC_ENDPOINT</code>. Chỉ URL được đưa vào HTML; <b>không đưa token Drive hay mật khẩu Admin vào GitHub</b>.</div>${endpoint?`<div class="drive-link-row" style="margin-top:10px"><input readonly value="${esc(endpoint)}"><button class="btn secondary" id="copyBuiltInLine" type="button">Sao chép dòng cấu hình</button></div>`:''}`;panel.appendChild(section);if($('#copyBuiltInLine'))$('#copyBuiltInLine').onclick=async()=>{let line=`const BUILTIN_PUBLIC_ENDPOINT='${endpoint}';`;await navigator.clipboard.writeText(line);$('#copyBuiltInLine').textContent='Đã sao chép'}}
-  };
-  renderDrive=renderDriveHierarchy;
-
-  // Sau khi admin quay lại tab/trình duyệt, tự lấy dữ liệu mới từ thiết bị khác.
-  window.addEventListener('focus',()=>{if(state.admin&&!isParentOnlyMode())refreshSharedAdminData(false).then(changed=>{if(changed){let view=readUiSession().adminView||'dashboard';showAdminView(view)}})});
-  setInterval(()=>{if(state.admin&&!isParentOnlyMode())refreshSharedAdminData(false)},20000);
-
-
-/* ===== Drive Simple 9.0 · Auto endpoint stamp + Admin auth in Drive ===== */
-const SMARTFORMS_CONFIGURED_HTML_NAME='index.html';
-function endpointStampEscape(value){return String(value||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'")}
-async function smartFormsSourceHtml(){
-  if(/^https?:$/.test(location.protocol)){
-    let sourceUrl=new URL(location.href);sourceUrl.search='';sourceUrl.hash='';
-    try{let response=await fetch(sourceUrl.toString(),{cache:'no-store'});if(response.ok)return await response.text()}catch{}
-  }
-  return '<!doctype html>\n'+document.documentElement.outerHTML
-}
-async function createEndpointStampedHtml(endpoint,{download=true}={}){
-  endpoint=normalizeDriveBridgeUrl(endpoint);if(!endpoint)throw new Error('URL Apps Script không hợp lệ.');
-  BUILTIN_PUBLIC_ENDPOINT=endpoint;rememberPublicEndpoint(endpoint);state.publicEndpoint=endpoint;
-  try{localStorage.setItem(DRIVE_BRIDGE_URL_KEY,endpoint);localStorage.setItem(PUBLIC_ENDPOINT_KEY,endpoint)}catch{}
-  let source=await smartFormsSourceHtml(),safe=endpointStampEscape(endpoint),re=/\b(?:const|let)\s+BUILTIN_PUBLIC_ENDPOINT\s*=\s*(['"])[\s\S]*?\1\s*;/;
-  if(!re.test(source))throw new Error('Không tìm thấy vị trí BUILTIN_PUBLIC_ENDPOINT trong HTML.');
-  let configured=source.replace(re,`let BUILTIN_PUBLIC_ENDPOINT='${safe}';`);
-  if(download)downloadBlob(new Blob([configured],{type:'text/html;charset=utf-8'}),SMARTFORMS_CONFIGURED_HTML_NAME);
-  return configured
-}
-async function pushAdminAuthToDrive(auth,override={}){
-  let settings=await driveBridgeSettings(),endpoint=normalizeDriveBridgeUrl(override.endpoint)||normalizeDriveBridgeUrl(settings.appsScriptUrl)||await sharedAdminEndpoint(),token=String(override.token||settings.appsScriptToken||'').trim();
-  if(!endpoint||!token)return false;
-  await sharedAdminPost(endpoint,{action:'adminAuthPut',token,authJson:JSON.stringify(auth)},60000);return true
-}
-
-renderSettings=async function(){
-  let local=localAdminRecord(),endpoint=await sharedAdminEndpoint(),info=null;
-  if(endpoint)try{info=await sharedAdminInfo(endpoint)}catch{}
-  let currentUsername=String(info?.username||local.username||'');
-  $('#av-settings').innerHTML=`<div class="sectionHead"><div><h2>Cài đặt</h2><p>Tài khoản Admin dùng chung.</p></div></div><div class="card panel"><form id="changeAuthSimple" class="formgrid"><div class="field full"><label>Tên đăng nhập</label><input name="username" value="${esc(currentUsername)}" required minlength="3"></div><div class="field"><label>Mật khẩu hiện tại</label><input name="current" type="password" required></div><div class="field"><label>Mật khẩu mới</label><input name="password" type="password" minlength="8" placeholder="Để trống nếu không đổi"></div><div class="field full"><button class="btn primary">Lưu tài khoản Admin</button></div></form><div id="authSaveStatus" style="margin-top:12px"></div></div>`;
-  $('#changeAuthSimple').onsubmit=async event=>{
-    event.preventDefault();let data=collectForm(event.target),box=$('#authSaveStatus'),button=event.submitter||event.target.querySelector('button');
-    try{
-      button.disabled=true;button.textContent='Đang cập nhật…';
-      let next=null,remote=false;
-      if(endpoint&&info?.configured){
-        let it=Number(info.it||180000),currentHash=await passwordHash(data.current,info.salt,it),loginResult=await sharedAdminPost(endpoint,{action:'adminLogin',username:currentUsername,hash:currentHash},60000),sessionToken=String(loginResult.data?.sessionToken||loginResult.sessionToken||'');
-        if(!sessionToken)throw new Error('Không xác minh được phiên Admin.');
-        next={username:data.username.trim(),salt:info.salt,hash:currentHash,it};
-        if(data.password){next.salt=arrayBufferToBase64(crypto.getRandomValues(new Uint8Array(16)).buffer);next.hash=await passwordHash(data.password,next.salt,it)}
-        await pushAdminAuthToDrive(next,{endpoint,token:sessionToken});remote=true;
-      }else{
-        let old=localAdminRecord();if(!old.salt||!old.hash)throw new Error('Chưa có tài khoản Admin.');let verify=await passwordHash(data.current,old.salt,old.it||180000);if(verify!==old.hash)throw new Error('Mật khẩu hiện tại không đúng.');
-        next={username:data.username.trim(),salt:old.salt,hash:old.hash,it:old.it||180000};if(data.password){next.salt=arrayBufferToBase64(crypto.getRandomValues(new Uint8Array(16)).buffer);next.hash=await passwordHash(data.password,next.salt,next.it)}
-      }
-      localStorage.setItem('st_pdf_admin',JSON.stringify(next));currentUsername=next.username;
-      box.innerHTML=`<div class="notice ok">Đã cập nhật tài khoản Admin${remote?' trên Drive':''}. Thiết bị khác sẽ dùng thông tin mới ở lần đăng nhập tiếp theo.</div>`;
-      button.textContent='Đã lưu';setTimeout(()=>{if(button){button.disabled=false;button.textContent='Lưu tài khoản Admin'}},1200)
-    }catch(error){button.disabled=false;button.textContent='Lưu tài khoản Admin';box.innerHTML=`<div class="notice bad">${esc(/invalid admin credentials/i.test(error.message)?'Mật khẩu hiện tại không đúng.':error.message)}</div>`}
-  }
-};
-
-renderDriveHierarchy=async function(){
-  let settings=await driveBridgeSettings(),cfg=driveBridgeConfig(settings),root=driveHierarchyRoot(settings),forms=(await idbAll('forms')).sort((a,b)=>String(b.updatedAt||b.createdAt||'').localeCompare(String(a.updatedAt||a.createdAt||''))),apps=await idbAll('apps'),configured=!!(cfg.endpoint&&cfg.token&&root),parentLink=cfg.endpoint?publicShareUrl(cfg.endpoint,settings.publicSiteUrl||''):'',builtIn=normalizeDriveBridgeUrl(BUILTIN_PUBLIC_ENDPOINT),endpointEmbedded=!!(cfg.endpoint&&builtIn===cfg.endpoint);
-  $('#av-drive').innerHTML=`<div class="sectionHead"><div><h2>Đồng bộ</h2><p>Một nguồn Drive chung cho toàn bộ Admin.</p></div></div><div class="card panel"><form id="driveSimpleCfg" class="formgrid"><div class="field full"><label>URL Web App Apps Script</label><input name="appsScriptUrl" value="${esc(cfg.endpoint)}" placeholder="https://script.google.com/macros/s/.../exec" required><div class="field-hint">Khi lưu, URL được dùng ngay trên máy này và hệ thống tự tạo <b>index.html</b> đã gắn URL để thay file trên GitHub.</div></div><div class="field full"><label>SMARTFORMS_DRIVE_TOKEN</label><input name="appsScriptToken" type="password" value="${esc(cfg.token)}" autocomplete="off" required></div><div class="field full"><label>Thư mục mẹ Google Drive</label><div class="drive-link-row"><input name="folderUrl" value="${esc(root)}" placeholder="https://drive.google.com/drive/folders/..." required><a class="btn secondary btn-link ${root?'':'hidden'}" href="${esc(root||'#')}" target="_blank" rel="noopener">Mở Drive ↗</a></div></div><div class="field full"><button class="btn primary">Lưu & đồng bộ</button></div></form><div id="driveProgress" style="margin-top:12px">${configured?`<div class="notice ok">Đã có nguồn dữ liệu chung.${endpointEmbedded?' URL Apps Script đã nằm sẵn trong HTML hiện tại.':' URL đang được nhớ trên thiết bị; hãy dùng file index.html tự tạo sau lần lưu để GitHub gốc biết URL trên mọi máy.'}</div>`:'<div class="notice warn">Chưa cấu hình nguồn Drive chung.</div>'}</div><div class="section-box" style="margin-top:14px"><b>Cấu trúc Drive</b><div class="muted" style="margin-top:7px;line-height:1.75;font-size:11.5px">📁 ST SmartForms<br>　├─ 📁 00 - Thông tin Admin → <b>admin.json</b><br>　└─ 📁 01 - Biểu mẫu<br>　　　└─ 📁 Tên biểu mẫu<br>　　　　　├─ 📁 01 - File gốc<br>　　　　　└─ 📁 02 - Hồ sơ học sinh</div></div><div class="actions" style="margin-top:14px"><button class="btn secondary" id="driveSimpleTest">Kiểm tra Drive</button><button class="btn secondary" id="driveSimpleSync">Đồng bộ lại</button><button class="btn secondary" id="driveSimplePull">Lấy dữ liệu về</button></div>${parentLink?`<div class="section-box" style="margin-top:14px"><b>Link phụ huynh</b><div class="drive-link-row" style="margin-top:8px"><input id="publicParentLink" readonly value="${esc(parentLink)}"><button class="btn secondary" id="copyParentLink" type="button">Sao chép</button></div><div class="field-hint">Trang phụ huynh chỉ nhận danh sách biểu mẫu <b>đang công khai</b> và PDF trong “01 - File gốc”; kho “02 - Hồ sơ học sinh” không được liệt kê ra trang công khai.</div></div>`:''}<details style="margin-top:14px"><summary><b>Apps Script Drive Simple 9.0</b></summary><div class="setup-guide"><b>Thiết lập một lần:</b> thay mã Apps Script Drive cũ bằng mã dưới đây → chạy <b>setupSmartFormsDrive</b> → Deploy Web App với <b>Execute as: Me</b> và <b>Who has access: Anyone</b>.</div><textarea id="driveHierarchyCode" readonly spellcheck="false" style="min-height:360px;font-family:Consolas,Monaco,monospace;font-size:11px;line-height:1.45;margin-top:10px"></textarea><button class="btn secondary" id="copyDriveHierarchyCode" type="button">Sao chép mã Apps Script</button></details><div class="field-hint" style="margin-top:12px">Hiện có ${forms.length} biểu mẫu · ${apps.length} hồ sơ.</div></div>`;
-  $('#driveHierarchyCode').value=DRIVE_HIERARCHY_APPS_SCRIPT;
-  $('#copyDriveHierarchyCode').onclick=async()=>{let b=$('#copyDriveHierarchyCode'),ok=await copyEmbeddedText(DRIVE_HIERARCHY_APPS_SCRIPT);b.textContent=ok?'Đã sao chép':'Không sao chép được';setTimeout(()=>{if(b)b.textContent='Sao chép mã Apps Script'},1500)};
-  if($('#copyParentLink'))$('#copyParentLink').onclick=async()=>{await copyEmbeddedText($('#publicParentLink').value);$('#copyParentLink').textContent='Đã sao chép'};
-  $('#driveSimpleCfg').onsubmit=async event=>{
-    event.preventDefault();let data=collectForm(event.target),box=$('#driveProgress'),button=event.submitter||event.target.querySelector('button');button.disabled=true;button.textContent='Đang lưu…';
-    try{
-      let folder=normalizeDriveFolderUrl(data.folderUrl),url=normalizeDriveBridgeUrl(data.appsScriptUrl),token=data.appsScriptToken.trim();assertDriveBridge({appsScriptUrl:url,appsScriptToken:token});
-      await saveGatewayLocal({folderUrl:folder,formFolders:{},appsScriptUrl:url,appsScriptToken:token,autoForms:true,autoApps:true});BUILTIN_PUBLIC_ENDPOINT=url;rememberPublicEndpoint(url);
-      for(let form of forms){form.driveFolderUrl=folder;await idbPut('forms',form)}
-      await driveHierarchyHealth(folder,{force:true});await bootstrapSharedAdminIfPossible();await syncAllDriveHierarchy();await bootstrapPublicService();
-      box.innerHTML='<div class="notice ok">Đã đồng bộ Drive. Đang tạo index.html đã gắn URL Apps Script…</div>';
-      try{await createEndpointStampedHtml(url,{download:true});box.innerHTML='<div class="notice ok"><b>Đã xong.</b> Drive đã đồng bộ và trình duyệt đã tạo file <b>index.html</b> có URL Apps Script nằm sẵn. Dùng file đó thay index trên GitHub để máy mới tự nhận đúng nguồn chung.</div>'}catch(stampError){box.innerHTML=`<div class="notice warn">Drive đã đồng bộ. Không tạo được HTML cấu hình tự động: ${esc(stampError.message)}</div>`}
-      button.textContent='Đã lưu';setTimeout(()=>renderDriveHierarchy(),1200)
-    }catch(error){button.disabled=false;button.textContent='Lưu & đồng bộ';box.innerHTML=`<div class="notice bad">${esc(driveHierarchyError(error))}</div>`}
-  };
-  $('#driveSimpleTest').onclick=async()=>{let box=$('#driveProgress');try{let data=collectForm($('#driveSimpleCfg')),folder=normalizeDriveFolderUrl(data.folderUrl),url=normalizeDriveBridgeUrl(data.appsScriptUrl),token=data.appsScriptToken.trim();assertDriveBridge({appsScriptUrl:url,appsScriptToken:token});await saveGatewayLocal({folderUrl:folder,appsScriptUrl:url,appsScriptToken:token});let result=await driveHierarchyHealth(folder,{force:true});box.innerHTML=`<div class="notice ok">Kết nối thành công: <b>${esc(result.folderName)}</b>.</div>`}catch(error){box.innerHTML=`<div class="notice bad">${esc(driveHierarchyError(error))}</div>`}};
-  $('#driveSimpleSync').onclick=syncAllDriveHierarchy;
-  $('#driveSimplePull').onclick=async()=>{let box=$('#driveProgress');try{let result=await pullDriveHierarchy();box.innerHTML=`<div class="notice ok">Đã lấy ${result.restoredForms} biểu mẫu và ${result.restoredApps} hồ sơ từ Drive.</div>`}catch(error){box.innerHTML=`<div class="notice bad">${esc(driveHierarchyError(error))}</div>`}}
-};
-renderDrive=renderDriveHierarchy;
-showAdminView=function(view){let allowed=['dashboard','forms','records','drive','gmail','settings'];if(!allowed.includes(view))view='dashboard';writeUiSession({adminView:view});$$('.sidebtn[data-av]').forEach(button=>button.classList.toggle('active',button.dataset.av===view));for(let name of allowed){let pane=$('#av-'+name);if(pane)pane.classList.toggle('hidden',name!==view)}({dashboard:renderDashboard,forms:renderAdminForms,records:renderRecords,drive:renderDriveHierarchy,gmail:renderGmail,settings:renderSettings}[view])()};
-/* ===== End Drive Simple 9.0 ===== */
-
-  applyParentOnlyMode();
-  /* ===== End Shared Admin 8.0 + Parent-only link ===== */
-
  /* ===== End Google Drive phân cấp ===== */
  /* ===== End Gmail-only mode ===== */
 })();
 /* ===== End Drive Gateway override ===== */
 
 
-
-/* ===== Admin Portal 9.0 behavior ===== */
-function portalParentMode(){try{let u=new URL(location.href);return u.searchParams.get('ph')==='1'||u.searchParams.get('mode')==='parent'}catch{return false}}
-function renderPortalHome(){
-  let home=$('#page-home');if(!home)return;
-  if(portalParentMode()){
-    home.innerHTML=`<div class="hero"><span class="pill">✦ Biểu mẫu điện tử</span><h1>Thực hiện hồ sơ trực tuyến.</h1><p>Chọn biểu mẫu được nhà trường công khai, điền thông tin trực tiếp trên mẫu PDF và gửi hồ sơ.</p><div class="actions"><button class="btn light" onclick="document.querySelector('#formsHead')?.scrollIntoView({behavior:'smooth'})">Xem biểu mẫu ↓</button><button class="btn secondary" onclick="goPage('lookup')">Tra cứu hồ sơ</button></div></div><div class="sectionHead" id="formsHead"><div><h2>Biểu mẫu được công khai</h2><p>Chọn thủ tục cần thực hiện.</p></div></div><div class="grid" id="publicForms"></div>`;
-  }
-}
-function configurePortalChrome(){
-  let homeBtn=document.querySelector('.navbtn[data-page="home"]'),lookupBtn=document.querySelector('.navbtn[data-page="lookup"]'),adminBtn=document.querySelector('.navbtn[data-page="admin"]');
-  if(portalParentMode()){
-    if(homeBtn)homeBtn.textContent='Biểu mẫu';if(lookupBtn)lookupBtn.classList.remove('hidden');if(adminBtn)adminBtn.remove();
-  }else{
-    if(homeBtn)homeBtn.textContent='Hướng dẫn';if(lookupBtn)lookupBtn.classList.add('hidden');if(adminBtn)adminBtn.textContent='Quản trị';
-  }
-}
-const portalRenderPublicFormsBase=renderPublicForms;
-renderPublicForms=async function(){if(!$('#publicForms'))return;return portalRenderPublicFormsBase()};
-const portalRenderAdminGateBase=renderAdminGate;
-renderAdminGate=async function(){
-  await portalRenderAdminGateBase();
-  if(state.admin||portalParentMode())return;
-  let gate=$('#adminGate');if(!gate||gate.querySelector('.admin-entry-grid'))return;
-  let loginCard=gate.firstElementChild;if(!loginCard)return;
-  // Các thông báo cấu hình vẫn tồn tại nhưng được rút thành một dòng trạng thái gọn.
-  let noisy=loginCard.querySelector('.notice.warn');if(noisy){let d=document.createElement('div');d.className='admin-inline-status';d.innerHTML=noisy.innerHTML;noisy.replaceWith(d)}
-  let shell=document.createElement('div');shell.className='admin-entry-grid';
-  let guide=document.createElement('section');guide.className='admin-entry-guide';guide.innerHTML=`<span class="pill">Cổng quản trị</span><h1>SmartForms Admin</h1><p>Link GitHub gốc chỉ dành cho quản trị viên. Sau khi đăng nhập, hệ thống lấy dữ liệu mới nhất từ nguồn dùng chung để tiếp tục đúng trạng thái đã thay đổi ở thiết bị trước.</p><div class="admin-entry-steps"><div class="admin-entry-step"><i>1</i><div><b>Đăng nhập cùng một tài khoản</b><small>Không phụ thuộc trình duyệt hay thiết bị.</small></div></div><div class="admin-entry-step"><i>2</i><div><b>Tự lấy dữ liệu mới nhất</b><small>Biểu mẫu, hồ sơ và trạng thái công khai được đồng bộ từ Drive/Apps Script.</small></div></div><div class="admin-entry-step"><i>3</i><div><b>Phụ huynh dùng link riêng</b><small>Link phụ huynh không có mục đăng nhập quản trị.</small></div></div></div>`;
-  let loginWrap=document.createElement('div');loginWrap.className='admin-entry-login';loginWrap.appendChild(loginCard);shell.append(guide,loginWrap);gate.replaceChildren(shell);
-};
-// Link gốc luôn mở cổng đăng nhập/quản trị; link phụ huynh luôn mở biểu mẫu công khai.
-restoreUiSession=function(){if(portalParentMode())goPage('home',{restore:true});else goPage('admin',{restore:true})};
-// Tên menu ngắn gọn để dashboard đỡ rối.
-(function compactAdminNavigation(){let labels={dashboard:'Tổng quan',forms:'Biểu mẫu',records:'Hồ sơ',drive:'Đồng bộ',gmail:'Gửi email',settings:'Cài đặt'};for(let [k,v] of Object.entries(labels)){let b=document.querySelector(`.sidebtn[data-av="${k}"]`);if(b)b.textContent=v}})();
-// Thu gọn riêng màn hình Đồng bộ: giữ chức năng, bỏ các khối mô tả lặp lại.
-const portalDriveBase=renderDriveHierarchy;
-renderDriveHierarchy=async function(){
-  await portalDriveBase();let pane=$('#av-drive');if(!pane)return;
-  let head=pane.querySelector('.sectionHead h2');if(head)head.textContent='Đồng bộ dữ liệu';let sub=pane.querySelector('.sectionHead p');if(sub)sub.textContent='Kết nối nguồn dữ liệu chung và tạo link phụ huynh.';
-  for(let box of [...pane.querySelectorAll('.section-box')]){let t=(box.textContent||'').trim();if(t.startsWith('Cấu trúc được tạo tự động')||t.startsWith('Dữ liệu hiện có')||t.startsWith('Admin dùng chung trên mọi thiết bị'))box.remove()}
-  let details=pane.querySelector('details');if(details){let sum=details.querySelector('summary b');if(sum)sum.textContent='Thiết lập nâng cao / Apps Script'}
-  let extra=$('#sharedAdminDeployNote');if(extra)extra.remove();
-};
-renderDrive=renderDriveHierarchy;
-/* ===== End Admin Portal 9.0 behavior ===== */
-
-(async()=>{installAdminSession();await openDB();renderPortalHome();configurePortalChrome();renderLookup();await bootstrapPublicService();await renderPublicForms();cleanNotes();restoreUiSession()})().catch(e=>alert('Không khởi động được hệ thống: '+e.message));
+(async()=>{installAdminSession();await openDB();renderLookup();await bootstrapPublicService();renderPublicForms();cleanNotes();restoreUiSession()})().catch(e=>alert('Không khởi động được hệ thống: '+e.message));
 </script></body></html>
