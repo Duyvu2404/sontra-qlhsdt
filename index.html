@@ -2644,7 +2644,7 @@ const splitForSlotsBeforeYearPair=splitForSlots;
 splitForSlots=function(text,slots,field=null){if(field&&isSchoolYearField(field)&&slots.length===2){let[start,end]=schoolYearParts(text);if(start&&end){let short=slots.every(slot=>Number(slot.width||0)<80);return short?[start.slice(-2),end.slice(-2)]:[start,end]}}return splitForSlotsBeforeYearPair(text,slots,field)};
 document.addEventListener('input',event=>{let input=event.target.closest?.('[data-year-part]');if(!input)return;input.value=input.value.replace(/\D/g,'').slice(0,4);let box=input.closest('.year-pair'),start=box.querySelector('[data-year-part="start"]'),end=box.querySelector('[data-year-part="end"]'),hidden=box.querySelector('input[type="hidden"]');if(input.dataset.yearPart==='start'&&start.value.length===4&&!end.value)end.value=String(Number(start.value)+1);end.setCustomValidity(start.value.length===4&&end.value.length===4&&Number(end.value)<Number(start.value)?'Năm kết thúc không được nhỏ hơn năm bắt đầu.':'');hidden.value=start.value&&end.value?start.value+' - '+end.value:'';if(hidden.name&&state.currentForm){state.custom[hidden.name]=hidden.value;queuePreview()}},{passive:true});
 
-async function downloadWordTemplate(formId){let form=await idbGet('forms',formId),summary=(state.publicCatalog||[]).find(item=>item.id===formId);if(form&&bufferAlive(form.wordBuffer)){downloadBlob(new Blob([form.wordBuffer],{type:form.wordMime||wordMimeFromName(form.wordOriginalName)}),formWordTemplateName(form));return}let endpoint=await driveBridgeEndpoint();if(!endpoint)throw new Error('Không tìm thấy kết nối để tải mẫu Word.');let result=await jsonp(endpoint,{action:'publicWordTemplate',formId},90000);if(!result.ok||!result.wordBase64)throw new Error(result.error||'Biểu mẫu này chưa có file Word gốc.');let wordBuffer=base64ToArrayBuffer(result.wordBase64),record={...(form||summary||{id:formId}),id:formId,wordBuffer,wordOriginalName:result.wordName||'',wordMime:result.wordMime||wordMimeFromName(result.wordName),hasWordTemplate:true,_driveWordName:result.wordName||''};await idbPut('forms',record);downloadBlob(new Blob([wordBuffer],{type:record.wordMime}),formWordTemplateName(record))}
+async function downloadWordTemplate(formId){let form=await idbGet('forms',formId),summary=(state.publicCatalog||[]).find(item=>item.id===formId);if(!isParentPortal()&&form&&bufferAlive(form.wordBuffer)){downloadBlob(new Blob([form.wordBuffer],{type:form.wordMime||wordMimeFromName(form.wordOriginalName)}),formWordTemplateName(form));return}let endpoint=await driveBridgeEndpoint();if(!endpoint)throw new Error('Không tìm thấy kết nối để tải mẫu Word.');let result=await jsonp(endpoint,{action:'publicWordTemplate',formId},90000);if(!result.ok||!result.wordBase64)throw new Error(result.error||'Biểu mẫu này chưa có file Word gốc.');let wordBuffer=base64ToArrayBuffer(result.wordBase64),record={...(form||summary||{id:formId}),id:formId,wordBuffer,wordOriginalName:result.wordName||'',wordMime:result.wordMime||wordMimeFromName(result.wordName),hasWordTemplate:true,_driveWordName:result.wordName||''};await idbPut('forms',record);downloadBlob(new Blob([wordBuffer],{type:record.wordMime}),formWordTemplateName(record))}
 async function downloadLatestApplicationWord(id){let app=await idbGet('apps',id);if(!app||!bufferAlive(app.word))throw new Error('Không tìm thấy file Word hiện hành.');downloadBlob(new Blob([app.word],{type:app.wordMime||wordMimeFromName(app.wordName)}),applicationWordName(app))}
 
 async function openWordSubmission(formId,applicationId='',actor='parent'){
@@ -2690,7 +2690,7 @@ const processingStatus=(()=>{
  const css=document.createElement('style');css.textContent=`#processingStatus{position:fixed;bottom:18px;right:18px;width:min(360px,calc(100vw - 36px));z-index:100000;background:#fff;color:#17324c;border:1px solid #bfd9ed;border-radius:12px;box-shadow:0 5px 22px #163b6522;padding:14px 18px;pointer-events:none}#processingStatus[hidden]{display:none}#processingStatus strong{display:block;font-size:14px}#processingStatus progress{display:block;width:100%;height:6px;margin-top:10px;accent-color:#1478b8}@media print{#processingStatus{display:none}}`;
  document.head.appendChild(css);
  const box=document.createElement('div');box.id='processingStatus';box.hidden=true;box.setAttribute('role','status');box.setAttribute('aria-live','polite');box.innerHTML='<strong></strong><progress aria-label="Đang xử lý"></progress>';document.body.appendChild(box);
- return {async run(label,fn){
+ return {isBusy(){return !!active},async run(label,fn){
   if(!active){
    const operation={id:++sequence,pending:0,timer:null};active=operation;
    operation.timer=setTimeout(()=>{if(active===operation){box.querySelector('strong').textContent=label;box.hidden=false}},450);
@@ -2720,5 +2720,99 @@ for(const [name,label] of Object.entries({openPublicForm:'Đang mở biểu mẫ
 const renderDriveBeforeProcessing=renderDrive;
 renderDrive=async function(){await renderDriveBeforeProcessing();const code=$('#driveSharedCode'),copy=$('#copyDriveSharedCode');if(code)code.value=DRIVE_HIERARCHY_APPS_SCRIPT;if(copy)copy.textContent='Sao chép mã Apps Script 11.1';const summary=$('#av-drive details>summary b');if(summary)summary.textContent='Cài đặt kỹ thuật (Apps Script 11.1)';};
 
-(async()=>{installAdminSession();await openDB();renderLookup();await renderPublicForms();cleanNotes();restoreUiSession();setTimeout(()=>{bootstrapPublicService().then(()=>renderPublicForms()).catch(error=>console.warn('Không cập nhật được danh sách biểu mẫu:',error.message))},0)})().catch(e=>alert('Không khởi động được hệ thống: '+e.message));
+/* Parent catalog: quiet polling, retry on transport errors, preserve active drafts. */
+function publicCatalogSignature(forms){return JSON.stringify((forms||[]).map(f=>[f.id,f.updatedAt||'',f.title||'',f.description||'',f.sectionCount||0,f.recognizerVersion||'',!!f.hasWordTemplate]).sort((a,b)=>String(a[0]).localeCompare(String(b[0]))))}
+const jsonpBeforePublicRetry=jsonp;
+jsonp=async function(endpoint,params,timeout=25000){
+ const retryable=['publicCatalog','publicForm','publicWordTemplate'].includes(params?.action);
+ for(let attempt=0;;attempt++){
+  try{return await jsonpBeforePublicRetry(endpoint,{...params,_sfFresh:Date.now()},timeout)}catch(error){
+   if(!retryable||attempt>=1||navigator.onLine===false||!/Không kết nối được Google|Hết thời gian chờ Google/i.test(error.message||''))throw error;
+   await new Promise(resolve=>setTimeout(resolve,1000));
+  }
+ }
+};
+bootstrapPublicService=async function(){
+ const endpoint=await publicServiceEndpoint();state.publicServiceExpected=!!endpoint;
+ if(!endpoint){state.publicServiceError='Link này thiếu địa chỉ dịch vụ nhận hồ sơ. Vui lòng mở đúng liên kết phụ huynh do nhà trường cung cấp.';return false}
+ try{
+  const result=await jsonp(endpoint,{action:'publicCatalog'},35000);
+  if(!result?.ok)throw new Error(result?.error||'Dịch vụ chưa trả về danh sách biểu mẫu.');
+  if(!String(result.apiVersion||'').includes('Hierarchy 7.0')||!Array.isArray(result.forms))throw new Error('Dịch vụ biểu mẫu cần được nhà trường cập nhật Apps Script.');
+  state.publicCatalog=result.forms;state.publicServiceReady=true;state.publicServiceError='';return true;
+ }catch(error){
+  state.publicServiceError=navigator.onLine===false?'Thiết bị đang mất mạng. Trang sẽ tự kết nối lại khi có Internet.':/Không kết nối được Google|Hết thời gian chờ Google/i.test(error.message||'')?'Chưa nhận được phản hồi từ Google. Trang sẽ tự thử lại; nếu lỗi kéo dài, nhà trường cần kiểm tra URL và quyền truy cập Web App.':String(error.message||error);
+  return false; // Keep the last successful catalog during a temporary outage.
+ }
+};
+const parentCatalogLive=(()=>{
+ let timer=null,clearNoticeTimer=null,inFlight=null,started=false,failures=0;
+ // Viewing a record is an active workflow too, even without a focused input.
+ let lastParentInteraction=0,parentActionPending=0;
+ const PARENT_IDLE_MS=15000;
+ function parentIsEnteringData(){
+  const visible=id=>{const element=$(id);return !!element&&!element.classList.contains('hidden')};
+  return visible('#workspace')||visible('#modal')||visible('#page-lookup')||parentActionPending>0||processingStatus.isBusy()||Date.now()-lastParentInteraction<PARENT_IDLE_MS||!!document.activeElement?.matches?.('input,textarea,select,[contenteditable="true"]');
+ }
+ function silenceCatalogNotice(){const box=$('#parentCatalogNotice');if(box){box.hidden=true;box.innerHTML=''}clearTimeout(clearNoticeTimer)}
+ function recordParentActivity(){if(!isParentPortal())return;lastParentInteraction=Date.now();silenceCatalogNotice()}
+ for(const type of ['pointerdown','keydown','input','change','submit','focusin','wheel','touchmove'])document.addEventListener(type,recordParentActivity,{capture:true,passive:true});
+ const editorObserver=new MutationObserver(()=>{if(isParentPortal()&&parentIsEnteringData())silenceCatalogNotice()});
+ for(const editor of [$('#workspace'),$('#modal'),$('#page-lookup')])if(editor)editorObserver.observe(editor,{attributes:true,attributeFilter:['class']});
+ // Track actual asynchronous actions without adding another loading indicator.
+ for(const name of ['openPublicForm','openWordSubmission','openParentEditor','viewParentApplication','downloadLatestApplicationPdf','downloadLatestApplicationWord','downloadWordTemplate','submitApplication','submitWordApplication']){
+  const action=window[name];if(typeof action!=='function')continue;
+  window[name]=async function(...args){
+   if(!isParentPortal())return action.apply(this,args);
+   parentActionPending++;recordParentActivity();
+   try{return await action.apply(this,args)}finally{parentActionPending--;lastParentInteraction=Date.now()}
+  };
+ }
+
+ function notice(message,kind='info',busy=false){
+  if(parentIsEnteringData()){silenceCatalogNotice();return}
+  let box=$('#parentCatalogNotice');if(!box){const list=$('#publicForms');if(!list)return;box=document.createElement('div');box.id='parentCatalogNotice';box.setAttribute('role','status');box.setAttribute('aria-live','polite');list.insertAdjacentElement('beforebegin',box)}
+  clearTimeout(clearNoticeTimer);box.hidden=!message;if(!message){box.innerHTML='';return}
+  box.className='notice '+(kind==='error'?'warn':kind==='ok'?'ok':'');box.style.marginBottom='14px';
+  box.innerHTML='<span></span>';box.querySelector('span').textContent=message;
+  if(busy)box.insertAdjacentHTML('beforeend','<progress aria-label="Đang cập nhật biểu mẫu" style="display:block;width:100%;height:6px;margin-top:8px"></progress>');
+  if(kind==='error'){const button=document.createElement('button');button.className='btn secondary';button.textContent='Thử kết nối lại';button.style.marginLeft='12px';button.onclick=()=>refresh(true);box.appendChild(button)}
+ }
+ function schedule(){clearTimeout(timer);if(started&&!document.hidden&&navigator.onLine!==false)timer=setTimeout(()=>refresh(),Math.min(120000,30000*Math.pow(2,failures)))}
+ function refresh(manual=false){
+  if(!isParentPortal())return Promise.resolve(false);
+  if(inFlight)return inFlight;
+  if(document.hidden&&!manual)return Promise.resolve(false);
+  clearTimeout(timer);
+  if(navigator.onLine===false){notice('Thiết bị đang mất mạng. Trang sẽ tự kết nối lại khi có Internet.','error');return Promise.resolve(false)}
+  const oldForms=state.publicCatalog||[],oldSignature=publicCatalogSignature(oldForms),first=!state.publicServiceReady;
+  if(first||manual)notice('Đang kết nối và tải danh sách biểu mẫu…','info',true);
+  inFlight=(async()=>{
+   const ok=await bootstrapPublicService();
+   if(!ok){failures++;notice(state.publicServiceError+(state.publicServiceReady?' Danh sách đang hiển thị là lần tải thành công gần nhất.':''),'error');return false}
+   failures=0;
+   const changed=publicCatalogSignature(state.publicCatalog)!==oldSignature;
+   if(first||changed){
+    notice(first?'Đang hiển thị danh sách biểu mẫu…':'Có thay đổi từ nhà trường. Đang cập nhật danh sách…','info',true);
+    // Let the browser paint the status before replacing only the catalog.
+    await new Promise(resolve=>setTimeout(resolve,60));await renderPublicForms();
+    let message=first?'Đã tải danh sách biểu mẫu.':'Đã cập nhật danh sách biểu mẫu mới nhất.';
+    const current=state.currentForm,previous=current&&oldForms.find(f=>f.id===current.id),next=current&&(state.publicCatalog||[]).find(f=>f.id===current.id);
+    if(changed&&current&&previous&&(!next||String(next.updatedAt)!==String(previous.updatedAt)))message+=' Biểu mẫu bạn đang điền vừa thay đổi. Nội dung đang nhập vẫn được giữ nguyên; vui lòng kiểm tra bản mới trước khi gửi.';
+    notice(message,'ok');
+    if(!current)clearNoticeTimer=setTimeout(()=>notice(''),4500);
+   }else notice('');
+   return true;
+  })().catch(error=>{failures++;notice('Chưa cập nhật được danh sách. Vui lòng thử lại.','error');return false}).finally(()=>{inFlight=null;schedule()});
+  return inFlight;
+ }
+ function start(){if(started||!isParentPortal())return;started=true;refresh()}
+ document.addEventListener('visibilitychange',()=>{if(!started)return;if(document.hidden)clearTimeout(timer);else refresh()});
+ window.addEventListener('online',()=>{if(started)refresh()});
+ window.addEventListener('offline',()=>{if(started){clearTimeout(timer);notice('Thiết bị đang mất mạng. Trang sẽ tự kết nối lại khi có Internet.','error')}});
+ window.addEventListener('pageshow',()=>{if(started)refresh()});
+ return{start,refresh};
+})();
+
+(async()=>{installAdminSession();await openDB();renderLookup();await renderPublicForms();cleanNotes();restoreUiSession();setTimeout(()=>{if(isParentPortal())parentCatalogLive.start();else bootstrapPublicService().then(()=>renderPublicForms()).catch(error=>console.warn('Không cập nhật được danh sách biểu mẫu:',error.message))},0)})().catch(e=>alert('Không khởi động được hệ thống: '+e.message));
 </script></body></html>
