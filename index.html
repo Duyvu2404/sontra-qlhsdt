@@ -1344,6 +1344,7 @@ function doGet(e){
 
 function publicUpload_(data,requestId){
   const cfg=publicConfig_(data.formId),b64=String(data.fileBase64||data.wordBase64||data.pdfBase64||''),itemKey=safe_(data.itemKey),fileName=recordFileName_(data.fileName||data.wordName||data.pdfName||'hoso.pdf',data.fileMime||'');
+  const pdfName=fileName_(data.pdfName||data.fileName||fileName);
   if(!cfg)return requestText_(requestId,false,'form unavailable');
   if(!itemKey||itemKey==='item'||!b64||b64.length>14000000)return requestText_(requestId,false,'invalid upload');
   const meta=JSON.parse(data.metaJson||'{}');
@@ -1457,7 +1458,7 @@ function errorText_(err){return String(err&&err.message||err||'Lỗi Apps Script
  async function driveBridgeSettings(){let d=await gatewaySettings();return{...d,appsScriptUrl:String(d.appsScriptUrl||''),appsScriptToken:String(d.appsScriptToken||''),publicSiteUrl:String(d.publicSiteUrl||'')}}
  function driveBridgeConfig(d){return{endpoint:normalizeDriveBridgeUrl(d?.appsScriptUrl),token:String(d?.appsScriptToken||'').trim(),publicSiteUrl:normalizePublicSiteUrl(d?.publicSiteUrl)}}
  function assertDriveBridge(d){let c=driveBridgeConfig(d);if(!validDriveBridgeUrl(c.endpoint))throw new Error('URL Apps Script không hợp lệ. Hãy dán link triển khai kết thúc bằng /exec.');if(!c.token)throw new Error('Chưa nhập SMARTFORMS_DRIVE_TOKEN.');return c}
- function driveBridgeError(error,formTitle=''){let raw=String(error?.message||error||'Lỗi Apps Script Drive.'),prefix=formTitle?`Biểu mẫu “${formTitle}”: `:'';if(/unauthorized/i.test(raw))return prefix+'Token Drive không đúng với Apps Script đang triển khai.';if(/permission|access denied|does not have|insufficient|requested entity was not found|không có quyền/i.test(raw))return prefix+`tài khoản chạy Apps Script${state.driveServiceAccount?' ('+state.driveServiceAccount+')':''} chưa có quyền Chỉnh sửa thư mục này. Hãy chia sẻ thư mục cho tài khoản đó với vai trò Người chỉnh sửa.`;if(/resource.?key/i.test(raw))return prefix+'link Drive cần giữ nguyên tham số resourcekey. Hãy sao chép lại toàn bộ link thư mục.';if(/quota|storage/i.test(raw))return prefix+'Google Drive hoặc Apps Script đã vượt hạn mức hiện tại.';if(/10 MB|too large|invalid upload/i.test(raw))return prefix+'PDF quá lớn hoặc không hợp lệ (tối đa 10 MB).';if(/service busy/i.test(raw))return prefix+'Apps Script đang xử lý lượt gửi khác. Hãy thử lại sau ít giây.';if(/rate limited/i.test(raw))return prefix+'có quá nhiều lượt nộp cùng lúc. Hãy chờ khoảng một phút.';if(/form unavailable/i.test(raw))return prefix+'biểu mẫu chưa được đăng ký công khai với Apps Script.';return prefix+raw}
+ function driveBridgeError(error,formTitle=''){let raw=String(error?.message||error||'Lỗi Apps Script Drive.'),prefix=formTitle?`Biểu mẫu “${formTitle}”: `:'';if(/unauthorized/i.test(raw))return prefix+'Token Drive không đúng với Apps Script đang triển khai.';if(/permission|access denied|does not have|insufficient|requested entity was not found|không có quyền/i.test(raw))return prefix+`tài khoản chạy Apps Script${state.driveServiceAccount?' ('+state.driveServiceAccount+')':''} chưa có quyền Chỉnh sửa thư mục này. Hãy chia sẻ thư mục cho tài khoản đó với vai trò Người chỉnh sửa.`;if(/resource.?key/i.test(raw))return prefix+'link Drive cần giữ nguyên tham số resourcekey. Hãy sao chép lại toàn bộ link thư mục.';if(/quota|storage/i.test(raw))return prefix+'Google Drive hoặc Apps Script đã vượt hạn mức hiện tại.';if(/invalid upload|missing file data|fileName is not defined/i.test(raw))return prefix+'Dịch vụ nhận tệp chưa tương thích. Hãy cập nhật Apps Script 12.0 rồi thử gửi lại.';if(/invalid pdf data|invalid file encoding/i.test(raw))return prefix+'Dữ liệu PDF không hợp lệ. Hãy tạo lại PDF từ hồ sơ.';if(/10 MB|too large/i.test(raw))return prefix+'Tệp vượt quá 10 MB. Vẫn có thể tải về máy; cần giảm dung lượng trước khi gửi Drive.';if(/service busy/i.test(raw))return prefix+'Apps Script đang xử lý lượt gửi khác. Hãy thử lại sau ít giây.';if(/rate limited/i.test(raw))return prefix+'có quá nhiều lượt nộp cùng lúc. Hãy chờ khoảng một phút.';if(/form unavailable/i.test(raw))return prefix+'biểu mẫu chưa được đăng ký công khai với Apps Script.';return prefix+raw}
  const driveBridgeErrorCore=driveBridgeError;
  driveBridgeError=function(error,formTitle=''){let raw=String(error?.message||error||'');if(formTitle&&/^Biểu mẫu “[^”]+”: /.test(raw))return raw;return driveBridgeErrorCore(error,formTitle)};
  driveErrorMessage=driveBridgeError;
@@ -1886,14 +1887,14 @@ function jsonp_(callback,value){return ContentService.createTextOutput(callback+
      }
      let record={id:uid('app'),code:code(),formId:form.id,formTitle:form.title,submittedAt:stamp,updatedAt:stamp,lastEditedAt:stamp,lastEditedBy:'Phụ huynh',revision:1,revisionLog:[{revision:1,editedAt:stamp,editor:'Phụ huynh',changedFields:['Tạo hồ sơ']}],needsReview:false,status:'Mới tiếp nhận',identityHash:await identityHash(state.identity),identity:structuredClone(state.identity),custom:structuredClone(state.custom),imageZoom:structuredClone(state.imageZoom),imagePosition:structuredClone(state.imagePosition),fieldLabels:labels,pdf};
      await idbPut('apps',record);$('#workStatus').textContent='Đã hoàn tất';
-     $('#workForm').innerHTML=`<div style="text-align:center;padding:35px 10px"><div style="font-size:50px">✓</div><h2>Hoàn tất hồ sơ</h2><p class="muted">${fmtTime(record.submittedAt)}</p><div class="notice ok">Mã hồ sơ: <b>${record.code}</b></div><div class="notice ok" style="margin-top:12px;text-align:left">PDF Bản 1 đã được tạo. Phụ huynh có thể vào <b>Tra cứu</b>, nhập mã hồ sơ cùng số điện thoại hoặc CCCD để chỉnh sửa nếu phát hiện sai.</div><div class="actions" style="justify-content:center;margin-top:16px"><button class="btn secondary" id="dlNow">Tải PDF</button><button class="btn secondary" id="printNow">In hồ sơ</button><button class="btn primary" onclick="closeWorkspace()">Hoàn tất</button></div></div>`;
+     $('#workForm').innerHTML=`<div style="text-align:center;padding:35px 10px"><div style="font-size:50px">✓</div><h2>Hoàn tất hồ sơ</h2><p class="muted">${fmtTime(record.submittedAt)}</p><div class="notice ok">Mã hồ sơ: <b>${record.code}</b></div><div class="notice ok" style="margin-top:12px;text-align:left">PDF Bản 1 đã được tạo. Phụ huynh có thể vào <b>Tra cứu</b>, nhập lại thông tin Biểu mẫu xác nhận (không cần nhớ mã hồ sơ) để tìm và chỉnh sửa.</div><div class="actions" style="justify-content:center;margin-top:16px"><button class="btn secondary" id="dlNow">Tải PDF</button><button class="btn secondary" id="printNow">In hồ sơ</button><button class="btn primary" onclick="closeWorkspace()">Hoàn tất</button></div></div>`;
      $('#dlNow').onclick=()=>downloadBlob(new Blob([pdf],{type:'application/pdf'}),applicationPdfName(record));$('#printNow').onclick=()=>printPdfBytes(pdf);renderFilledPdfInTarget(pdf,$('#pdfPreview'));renderDashboard()
    }catch(error){alert('Không thể lưu hồ sơ: '+error.message);$('#workStatus').textContent='Lỗi'}
  };
  /* ===== End chỉnh sửa hồ sơ ===== */
 
  /* ===== Google Drive phân cấp · thay thế đúng hồ sơ hiện tại ===== */
-const DRIVE_HIERARCHY_APPS_SCRIPT=String.raw`const API_VERSION='ST SmartForms Drive Hierarchy 7.0.1 · Shared Access 8.0.1 · Recovery 9.0 · Delete Sync 10.2 · Word Upload 11.0 · Public Forms 11.1';
+const DRIVE_HIERARCHY_APPS_SCRIPT=String.raw`const API_VERSION='ST SmartForms Drive Hierarchy 7.0.1 · Shared Access 8.0.1 · Recovery 9.0 · Delete Sync 10.2 · Word Upload 11.0 · Public Forms 11.1 · Identity Lookup 12.0.1';
 const SYSTEM_ROOT='ST SmartForms - Hồ sơ hành chính';
 const FORM_SOURCE='01 - Biểu mẫu gốc';
 const FORM_RECORDS='02 - Hồ sơ đã tiếp nhận';
@@ -1920,6 +1921,7 @@ function doPost(e){
   try{
     const data=JSON.parse((e.postData&&e.postData.contents)||'{}');requestId=requestId_(data.requestId);
     if(data.action==='publicUpload')return publicUpload_(data,requestId);
+    if(data.action==='publicIdentitySearch')return requestText_(requestId,true,'verified',publicIdentitySearch_(data));
     if(data.action==='adminLogin')return adminLogin_(data,requestId);
     if(data.action==='adminPasswordReset')return adminPasswordReset_(data,requestId);
     requireToken_(data.token);
@@ -1998,9 +2000,14 @@ function doGet(e){
 }
 
 function publicUpload_(data,requestId){
-  const cfg=publicConfig_(data.formId),b64=String(data.pdfBase64||''),itemKey=safe_(data.itemKey),pdfName=fileName_(data.pdfName||'hoso.pdf');
+  const cfg=publicConfig_(data.formId),b64=String(data.fileBase64||data.wordBase64||data.pdfBase64||''),itemKey=safe_(data.itemKey),fileName=recordFileName_(data.fileName||data.wordName||data.pdfName||'hoso.pdf',data.fileMime||'');
   if(!cfg)return requestText_(requestId,false,'form unavailable');
-  if(!itemKey||itemKey==='item'||!b64||b64.length>14000000)return requestText_(requestId,false,'invalid upload');
+  if(!itemKey||itemKey==='item')return requestText_(requestId,false,'invalid item key');
+  if(!b64)return requestText_(requestId,false,'missing file data');
+  if(b64.length>13981016)return requestText_(requestId,false,'file too large');
+  let bytes;try{bytes=Utilities.base64Decode(b64)}catch(err){return requestText_(requestId,false,'invalid file encoding')}
+  if(bytes.length>10*1024*1024)return requestText_(requestId,false,'file too large');
+  if(/\.pdf$/i.test(fileName)&&String.fromCharCode.apply(null,bytes.slice(0,5).map(x=>x&255))!=='%PDF-')return requestText_(requestId,false,'invalid pdf data');
   const meta=JSON.parse(data.metaJson||'{}');if(String(meta.formId||'')!==String(cfg.formId||''))return requestText_(requestId,false,'form mismatch');
   const lock=LockService.getScriptLock();if(!lock.tryLock(30000))return requestText_(requestId,false,'service busy');
   try{
@@ -2150,6 +2157,30 @@ function findApplicationIndex_(code){
   const configs=adminCatalog_(),seen={};for(let i=0;i<configs.length;i++){try{const base=folder_(configs[i].folderUrl),baseId=base.getId();if(seen[baseId])continue;seen[baseId]=true;const root=systemRoot_(base,false);if(!root)continue;const homes=root.getFolders();while(homes.hasNext()){const home=homes.next(),records=findChild_(home,FORM_RECORDS);if(!records)continue;const folders=records.getFolders();while(folders.hasNext()){const item=folders.next(),meta=readMeta_(item);if(meta&&String(meta.code||'').toUpperCase().replace(/\s+/g,'')===code){const found={code:code,formId:String(meta.formId||markedId_(home.getName())),itemKey:String(meta.id||markedId_(item.getName())),folderId:baseId};props.setProperty(applicationCodeKey_(code),JSON.stringify(found));return found}}}}catch(err){}}
   return null;
 }
+function publicIdentitySearch_(data){
+ const wanted=String(data.identityHash||'').toLowerCase(),proof=String(data.proofHash||'').toLowerCase();
+ if(!/^[a-f0-9]{64}$/.test(wanted)||!/^[a-f0-9]{64}$/.test(proof))throw new Error('invalid verification');
+ const cache=CacheService.getScriptCache(),rate='IDENTITY_SEARCH_RATE',count=Number(cache.get(rate)||0);
+ if(count>=40)throw new Error('rate limited');cache.put(rate,String(count+1),60);
+ const roots={},results=[],seen={};
+ for(const cfg of adminCatalog_()){
+  const base=folder_(cfg.folderUrl),rootId=base.getId();if(roots[rootId])continue;roots[rootId]=true;
+  const root=systemRoot_(base,false);if(!root)continue;
+  const homes=root.getFolders();while(homes.hasNext()){
+   const home=homes.next(),records=findChild_(home,FORM_RECORDS);if(!records)continue;
+   const folders=records.getFolders();while(folders.hasNext()){
+    const item=folders.next(),meta=readMeta_(item);
+    if(!meta||!secureEqual_(String(meta.identityHash||''),wanted)||!parentProofHashes_(meta).some(hash=>secureEqual_(hash,proof)))continue;
+    const id=String(meta.id||markedId_(item.getName()));if(!id||!meta.code||seen[id])continue;seen[id]=true;
+    saveApplicationIndex_(base,id,meta);
+    results.push({id:id,code:String(meta.code),formTitle:String(meta.formTitle||'Ho so'),updatedAt:String(meta.lastEditedAt||meta.updatedAt||meta.submittedAt||''),status:String(meta.status||'')});
+    if(results.length>=50)return{apps:results,truncated:true};
+   }
+  }
+ }
+ results.sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt));return{apps:results,truncated:false};
+}
+
 function publicLookup_(query){
   const cache=CacheService.getScriptCache(),rateKey='PUBLIC_LOOKUP_RATE',count=Number(cache.get(rateKey)||0);if(count>=160)return{ok:false,error:'rate limited'};cache.put(rateKey,String(count+1),60);
   const code=String(query.applicationCode||'').toUpperCase().replace(/\s+/g,''),wanted=String(query.proofHash||'').toLowerCase();if(!/^ST-[A-Z0-9-]{6,40}$/.test(code)||!/^[a-f0-9]{64}$/.test(wanted))return{ok:false,error:'invalid verification'};
@@ -2370,7 +2401,7 @@ function errorText_(err){return String(err&&err.message||err||'Loi Apps Script')
  renderLookup=function(){let page=$('#page-lookup'),subtitle=page.querySelector('.sectionHead p'),notice=page.querySelector('.card>.notice');if(subtitle)subtitle.textContent='Tra cứu trên mọi điện thoại hoặc máy tính bằng mã hồ sơ.';if(notice){notice.className='notice';notice.innerHTML='<b>Thông tin xác minh:</b> nhập mã hồ sơ và đúng số điện thoại hoặc CCCD của phụ huynh đã khai.'}$('#lookupForm').innerHTML=`<div class="field"><label>Mã hồ sơ <span class="req">*</span></label><input name="applicationCode" placeholder="Ví dụ: ST-2026-ABC123" autocomplete="off" required></div><div class="field"><label>Số điện thoại hoặc CCCD phụ huynh <span class="req">*</span></label><input name="parentProof" inputmode="numeric" autocomplete="off" required></div><div class="field full"><button class="btn primary">Xác minh & xem hồ sơ</button></div>`;$('#lookupResult').innerHTML='';$('#lookupForm').onsubmit=async event=>{event.preventDefault();let data=collectForm(event.target),box=$('#lookupResult'),button=event.submitter||event.target.querySelector('button');button.disabled=true;button.textContent='Đang tra cứu…';box.innerHTML='';try{let app=await fetchSharedApplication(data.applicationCode,data.parentProof);ensureParentEditAccess().add(app.id);let revision=applicationRevision(app);box.innerHTML=`<div class="notice ok" style="margin-top:18px"><b>Đã xác minh hồ sơ ${esc(app.code)}.</b> Đây là bản mới nhất trên Google Drive.</div><div class="record" style="align-items:flex-start"><div><b>${esc(app.formTitle)}</b><div class="muted">${esc(app.identity?.studentName||'')} · ${esc(app.identity?.className||'')}<br>Cập nhật: ${fmtTime(applicationLatestAt(app))} · Bản ${revision}</div></div><div class="actions"><span class="badge ${app.needsReview?'warn':'ok'}">${esc(app.status||'Mới tiếp nhận')}</span><button class="btn secondary" onclick="downloadLatestApplicationPdf('${esc(app.id)}')">Tải PDF</button><button class="btn primary" onclick="openParentEditor('${esc(app.id)}')">Chỉnh sửa thông tin</button></div></div>`}catch(error){box.innerHTML=`<div class="notice warn" style="margin-top:18px">${esc(/not found|invalid verification/i.test(error.message)?'Không tìm thấy hồ sơ. Hãy kiểm tra lại mã hồ sơ và thông tin xác minh.':error.message)}</div>`}finally{button.disabled=false;button.textContent='Xác minh & xem hồ sơ'}}};
  openParentEditor=async function(id){let app=await idbGet('apps',id);if(!app)return alert('Không tìm thấy hồ sơ.');let form=await idbGet('forms',app.formId);if(!form||!bufferAlive(form.pdfBuffer))try{await loadPublicForm(app.formId)}catch(error){return alert(error.message)}ensureParentEditAccess().add(id);return editApplication(id,'parent')};
 
- publicUploadApplication=async function(app){let endpoint=await driveBridgeEndpoint();if(!endpoint)throw new Error('Thiếu dịch vụ Drive. Hãy mở đúng link phụ huynh.');let isWord=applicationIsWord(app),bytes=isWord?app.word:app.pdf;if(!bufferAlive(bytes))throw new Error(isWord?'File Word hồ sơ không hợp lệ.':'PDF hồ sơ không hợp lệ.');let editToken=String(app._parentEditToken||''),{pdf,word,...meta}=app;delete meta._parentEditToken;let name=isWord?applicationWordName(app):applicationPdfName(app),mime=isWord?(app.wordMime||wordMimeFromName(name)):'application/pdf',requestId=driveRequestId(),started=Date.now();meta._driveFileName=name;meta.fileMime=mime;meta.driveSyncStatus='Đã chuyển lên Drive';meta.driveUploadedAt=nowISO();await fetch(endpoint,{method:'POST',mode:'no-cors',cache:'no-store',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'publicUpload',requestId,formId:app.formId,itemKey:app.id,editToken,metaJson:JSON.stringify(meta),fileBase64:await arrayBufferToBase64Async(bytes),fileName:name,fileMime:mime})});let receipt=null;for(let attempt=0;attempt<9&&Date.now()-started<150000;attempt++){await driveWait(Math.min(450+attempt*450,2500));let status=await jsonp(endpoint,{action:'publicRequestStatus',requestId},30000);if(status.ok&&status.pending)continue;if(status.ok&&status.result?.ok){receipt=status.result;break}if(status.ok&&status.result&&!status.result.ok)throw new Error(/parent verification expired/i.test(status.result.message||'')?'Phiên xác minh đã hết hạn. Hãy quay lại Tra cứu và xác minh lại.':driveHierarchyError(status.result.message))}if(!receipt)throw new Error('Apps Script chưa xác nhận đã nhận tệp hồ sơ.');if(receipt.data?.editToken){app._parentEditToken=receipt.data.editToken;await idbPut('apps',app)}for(let attempt=0;attempt<5;attempt++){let found=await jsonp(endpoint,{action:'publicHas',formId:app.formId,itemKey:app.id,fileName:name},30000);if(found.ok&&found.exists)return true;await driveWait(500*(attempt+1))}throw new Error('Drive chưa xác nhận tệp hiện tại của hồ sơ.')};
+ publicUploadApplication=async function(app){let endpoint=await driveBridgeEndpoint();if(!endpoint)throw new Error('Thiếu dịch vụ Drive. Hãy mở đúng link phụ huynh.');let isWord=applicationIsWord(app),bytes=isWord?app.word:app.pdf;if(!bufferAlive(bytes))throw new Error(isWord?'File Word hồ sơ không hợp lệ.':'PDF hồ sơ không hợp lệ.');let editToken=String(app._parentEditToken||''),{pdf,word,...meta}=app;delete meta._parentEditToken;let name=isWord?applicationWordName(app):applicationPdfName(app),mime=isWord?(app.wordMime||wordMimeFromName(name)):'application/pdf',requestId=driveRequestId(),started=Date.now();meta._driveFileName=name;meta.fileMime=mime;meta.driveSyncStatus='Đã chuyển lên Drive';meta.driveUploadedAt=nowISO();await fetch(endpoint,{method:'POST',mode:'no-cors',cache:'no-store',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'publicUpload',requestId,formId:app.formId,itemKey:app.id,editToken,metaJson:JSON.stringify(meta),fileBase64:await arrayBufferToBase64Async(bytes),fileName:name,fileMime:mime,pdfBase64:isWord?'':await arrayBufferToBase64Async(bytes),pdfName:isWord?'':name})});let receipt=null;for(let attempt=0;attempt<9&&Date.now()-started<150000;attempt++){await driveWait(Math.min(450+attempt*450,2500));let status=await jsonp(endpoint,{action:'publicRequestStatus',requestId},30000);if(status.ok&&status.pending)continue;if(status.ok&&status.result?.ok){receipt=status.result;break}if(status.ok&&status.result&&!status.result.ok)throw new Error(/parent verification expired/i.test(status.result.message||'')?'Phiên xác minh đã hết hạn. Hãy quay lại Tra cứu và xác minh lại.':driveHierarchyError(status.result.message))}if(!receipt)throw new Error('Apps Script chưa xác nhận đã nhận tệp hồ sơ.');if(receipt.data?.editToken){app._parentEditToken=receipt.data.editToken;await idbPut('apps',app)}for(let attempt=0;attempt<5;attempt++){let found=await jsonp(endpoint,{action:'publicHas',formId:app.formId,itemKey:app.id,fileName:name},30000);if(found.ok&&found.exists)return true;await driveWait(500*(attempt+1))}throw new Error('Drive chưa xác nhận tệp hiện tại của hồ sơ.')};
  setStatus=async function(id,status){let app=await idbGet('apps',id);if(!app)return;app.status=status;app.needsReview=false;app.statusUpdatedAt=nowISO();app.updatedAt=nowISO();await idbPut('apps',app);try{await syncAppToDrive(app,true,true,true)}catch(error){alert('Đã đổi trạng thái trên máy nhưng chưa cập nhật Drive: '+driveHierarchyError(error))}};
  (function simplifyAdminNavigation(){let labels={dashboard:'Tổng quan',forms:'Biểu mẫu',records:'Hồ sơ',gmail:'Gửi email',drive:'Kết nối Drive',settings:'Tài khoản'};$$('#page-admin .sidebtn[data-av]').forEach(button=>{button.textContent=labels[button.dataset.av]||button.textContent});let logout=$$('#page-admin .sidebar .sidebtn').find(button=>!button.dataset.av);if(logout)logout.textContent='Đăng xuất'})();
 
@@ -2569,7 +2600,49 @@ function errorText_(err){return String(err&&err.message||err||'Loi Apps Script')
  openParentEditor=async function(id){if(!parentHasResultAccess(id))return alert('Hãy xác minh lại mã hồ sơ trước khi chỉnh sửa.');let app=await idbGet('apps',id);if(!app)return alert('Không tìm thấy hồ sơ.');if(!app._parentEditToken)return alert('Phiên chỉnh sửa đã hết hạn. Hãy xác minh lại hồ sơ.');ensureParentEditAccess().add(id);if(applicationIsWord(app))return openWordSubmission(app.formId,id,'parent');let form=await idbGet('forms',app.formId);if(!form||!bufferAlive(form.pdfBuffer))try{form=await loadPublicForm(app.formId)}catch(error){return alert(error.message)}if(!form||!bufferAlive(form.pdfBuffer))return alert('Chưa tải được biểu mẫu PDF gốc.');return editApplication(id,'parent')};
  window.downloadLatestApplicationPdf=downloadLatestApplicationPdf;window.openParentEditor=openParentEditor;window.viewParentApplication=viewParentApplication;
 
- renderLookup=function(){let page=$('#page-lookup'),subtitle=page.querySelector('.sectionHead p'),notice=page.querySelector('.card>.notice'),form=$('#lookupForm'),box=$('#lookupResult');if(subtitle)subtitle.textContent='Tra cứu, xem lại, tải PDF hoặc chỉnh sửa hồ sơ đã nộp.';if(notice){notice.className='notice';notice.innerHTML='<b>Thông tin xác minh:</b> nhập mã hồ sơ và đúng số điện thoại hoặc CCCD của phụ huynh đã khai.'}if(form.dataset.lookupReady==='1'){if(!box.children.length)restoreParentLookupResult();return}form.dataset.lookupReady='1';let saved=readParentResultState();form.innerHTML=`<div class="field"><label>Mã hồ sơ <span class="req">*</span></label><input name="applicationCode" value="${esc(saved.applicationCode||'')}" placeholder="Ví dụ: ST-2026-ABC123" autocomplete="off" required></div><div class="field"><label>Số điện thoại hoặc CCCD phụ huynh <span class="req">*</span></label><input name="parentProof" inputmode="numeric" autocomplete="off" required></div><div class="field full"><button class="btn primary">Xác minh & mở hồ sơ</button><div class="performance-note" style="margin-top:9px">Kết quả gần nhất được giữ khi đổi mục hoặc mở lại trang trên thiết bị này.</div></div>`;form.elements.applicationCode.oninput=()=>{let code=cleanSpace(form.elements.applicationCode.value).toUpperCase(),old=readParentResultState();saveParentResultState({applicationCode:code,appId:old.applicationCode===code?old.appId||'':''})};form.onsubmit=async event=>{event.preventDefault();let data=collectForm(form),button=event.submitter||form.querySelector('button[type="submit"]'),wantedCode=cleanSpace(data.applicationCode).toUpperCase();saveParentResultState({appId:'',applicationCode:wantedCode});button.disabled=true;button.textContent='Đang tra cứu…';box.innerHTML='<div class="notice" style="margin-top:18px">Đang lấy bản hồ sơ mới nhất từ Google Drive…</div>';try{let app=await fetchSharedApplication(data.applicationCode,data.parentProof);ensureParentEditAccess().add(app.id);saveParentResultState({appId:app.id,applicationCode:cleanSpace(app.code).toUpperCase()});await showParentLookupResult(app,false);writeUiSession({page:'lookup'})}catch(error){box.innerHTML=`<div class="notice warn" style="margin-top:18px">${esc(/not found|invalid verification/i.test(error.message)?'Không tìm thấy hồ sơ. Hãy kiểm tra lại mã hồ sơ và thông tin xác minh.':error.message)}</div>`}finally{button.disabled=false;button.textContent='Xác minh & mở hồ sơ'}};restoreParentLookupResult()};
+ async function findApplicationsByIdentity(data){
+  const hash=await identityHash(data),proofHash=await parentProofHash(data.parentPhone),endpoint=await driveBridgeEndpoint();
+  const local=(await idbAll('apps')).filter(app=>app.identityHash===hash&&normDigits(app.identity?.parentPhone)===normDigits(data.parentPhone));
+  if(!endpoint){if(local.length)return{apps:local.map(app=>({...app,localOnly:true})),warning:'Các hồ sơ này chỉ có trên thiết bị hiện tại.'};throw new Error('Hãy mở đúng liên kết phụ huynh để tra cứu trên Drive.')}
+  try{
+   const result=await sharedPublicPostAt(endpoint,{action:'publicIdentitySearch',identityHash:hash,proofHash},150000);
+   if(!Array.isArray(result.apps))throw new Error('Dịch vụ tra cứu chưa được cập nhật Apps Script 12.0.');
+   const apps=result.apps.map(app=>({...app,localOnly:false})),ids=new Set(apps.map(app=>app.id));
+   for(const app of local)if(!ids.has(app.id)&&app.driveSyncStatus!=='Đã chuyển lên Drive')apps.push({...app,localOnly:true});
+   return{apps,warning:result.truncated?'Đang hiển thị tối đa 50 hồ sơ phù hợp.':''};
+  }catch(error){
+   const message=/invalid action|unauthorized/i.test(error.message||'')?'Nhà trường cần cập nhật Apps Script 12.0 để tra cứu bằng thông tin xác nhận.':error.message;
+   if(local.length)return{apps:local.map(app=>({...app,localOnly:true})),warning:'Chưa tra cứu được Drive: '+message+'. Đang hiển thị hồ sơ lưu trên thiết bị này.'};
+   throw new Error(message);
+  }
+ }
+ renderLookup=function(){
+  const page=$('#page-lookup'),form=$('#lookupForm'),box=$('#lookupResult'),notice=page.querySelector('.card>.notice');
+  if(notice){notice.className='notice';notice.innerHTML='Không nhớ mã hồ sơ? Nhập lại <b>thông tin trong Biểu mẫu xác nhận</b> đã khai khi nộp. Nếu còn mã, có thể chọn tra cứu nhanh bằng mã hồ sơ.'}
+  if(form.dataset.lookupReady==='identity-v12'){if(!box.children.length)restoreParentLookupResult();return}
+  form.dataset.lookupReady='identity-v12';const saved=readParentResultState();
+  form.innerHTML=`<div class="field full"><label>Cách tra cứu</label><select id="lookupMode"><option value="identity">Bằng thông tin Biểu mẫu xác nhận</option><option value="code">Bằng mã hồ sơ</option></select></div><fieldset id="identityLookupFields" class="full formgrid" style="border:0;padding:0;margin:0;min-width:0">${identityForm({})}</fieldset><fieldset id="codeLookupFields" class="full formgrid hidden" style="border:0;padding:0;margin:0;min-width:0" disabled><div class="field"><label>Mã hồ sơ</label><input name="applicationCode" value="${esc(saved.applicationCode||'')}" required></div><div class="field"><label>Số điện thoại hoặc CCCD phụ huynh</label><input name="parentProof" inputmode="numeric" required></div></fieldset><div class="field full"><button type="submit" class="btn primary">Xác minh & tìm hồ sơ</button></div>`;
+  const mode=$('#lookupMode'),identityFields=$('#identityLookupFields'),codeFields=$('#codeLookupFields');
+  mode.onchange=()=>{const byCode=mode.value==='code';identityFields.disabled=byCode;identityFields.classList.toggle('hidden',byCode);codeFields.disabled=!byCode;codeFields.classList.toggle('hidden',!byCode)};
+  form.onsubmit=async event=>{
+   event.preventDefault();if(form.dataset.busy==='1')return;form.dataset.busy='1';
+   const button=event.submitter||form.querySelector('button[type="submit"]'),data=collectForm(form),byCode=mode.value==='code';button.disabled=true;button.textContent='Đang xác minh…';box.innerHTML='<div class="notice">Đang tìm hồ sơ phù hợp…</div>';
+   try{
+    if(byCode){const app=await fetchSharedApplication(data.applicationCode,data.parentProof);ensureParentEditAccess().add(app.id);saveParentResultState({appId:app.id,applicationCode:app.code});await showParentLookupResult(app,false);return}
+    const result=await findApplicationsByIdentity(data);
+    if(!result.apps.length){box.innerHTML='<div class="notice warn">Không tìm thấy hồ sơ phù hợp. Hãy kiểm tra đủ thông tin xác nhận đã khai. Hồ sơ chưa gửi thành công lên Drive chỉ tra được trên thiết bị đã nhập.</div>';return}
+    box.innerHTML=(result.warning?`<div class="notice warn">${esc(result.warning)}</div>`:'')+`<div class="notice ok">Tìm thấy ${result.apps.length} hồ sơ phù hợp. Chọn hồ sơ cần xem, tải hoặc chỉnh sửa.</div>`+result.apps.map((app,index)=>`<div class="record"><div><b>${esc(app.formTitle)}</b><div class="muted">${esc(app.code)} · ${esc(app.status||'')}${app.localOnly?' · Chưa xác nhận trên Drive':''}</div></div><button class="btn secondary" type="button" data-identity-result="${index}">Mở hồ sơ</button></div>`).join('');
+    box.querySelectorAll('[data-identity-result]').forEach(control=>control.onclick=async()=>{
+     control.disabled=true;control.textContent='Đang mở…';
+     try{const summary=result.apps[Number(control.dataset.identityResult)],app=summary.localOnly?await idbGet('apps',summary.id):await fetchSharedApplication(summary.code,data.parentPhone);
+      if(!app)throw new Error('Không tìm thấy hồ sơ trên thiết bị.');ensureParentEditAccess().add(app.id);saveParentResultState({appId:app.id,applicationCode:app.code});await showParentLookupResult(app,!!summary.localOnly);
+      if(summary.localOnly){const subtitle=box.querySelector('.lookup-result-title p');if(subtitle)subtitle.textContent='Hồ sơ đang lưu trên thiết bị này; chưa xác nhận bản trên Drive.'}
+     }catch(error){alert(error.message)}finally{if(control.isConnected){control.disabled=false;control.textContent='Mở hồ sơ'}}
+    });
+   }catch(error){box.innerHTML=`<div class="notice warn">${esc(/not found|invalid verification/i.test(error.message)?'Thông tin xác minh chưa khớp. Vui lòng kiểm tra lại.':error.message)}</div>`}
+   finally{delete form.dataset.busy;button.disabled=false;button.textContent='Xác minh & tìm hồ sơ'}
+  };restoreParentLookupResult();
+ };
 
  let parentDraftSaveTimer=null;
  async function saveParentWorkspaceDraft(){if(!isParentPortal()||!state.currentForm)return;let record={id:PARENT_DRAFT_ID,active:true,savedAt:Date.now(),formId:state.currentForm.id,step:Number(state.step||0),identity:structuredClone(state.identity||{}),custom:structuredClone(state.custom||{}),imageZoom:structuredClone(state.imageZoom||{}),imagePosition:structuredClone(state.imagePosition||{}),editingAppId:state.editingAppId||'',editingActor:state.editingActor||'',editingRevision:Number(state.editingRevision||0)};await idbPut('settings',record)}
@@ -2718,7 +2791,19 @@ for(const [name,label] of Object.entries({openPublicForm:'Đang mở biểu mẫ
  window[name]=function(...args){return runUserOperation(label,()=>fn.apply(this,args))};
 }
 const renderDriveBeforeProcessing=renderDrive;
-renderDrive=async function(){await renderDriveBeforeProcessing();const code=$('#driveSharedCode'),copy=$('#copyDriveSharedCode');if(code)code.value=DRIVE_HIERARCHY_APPS_SCRIPT;if(copy)copy.textContent='Sao chép mã Apps Script 11.1';const summary=$('#av-drive details>summary b');if(summary)summary.textContent='Cài đặt kỹ thuật (Apps Script 11.1)';};
+renderDrive=async function(){await renderDriveBeforeProcessing();const code=$('#driveSharedCode'),copy=$('#copyDriveSharedCode');if(code)code.value=DRIVE_HIERARCHY_APPS_SCRIPT;if(copy)copy.textContent='Sao chép mã Apps Script 12.0.1';const summary=$('#av-drive details>summary b');if(summary)summary.textContent='Cài đặt kỹ thuật (Apps Script 12.0.1)';};
+
+const fillPdfBeforeBinaryFix=fillPdf;
+fillPdf=async function(...args){return cloneBuffer(await fillPdfBeforeBinaryFix(...args))};
+const downloadBlobBeforePdfFix=downloadBlob;
+downloadBlob=function(blob,name){
+ const targetName=String(name||'Ho-so.pdf').replace(/\.(html?|pdf)$/i,'')+'.pdf';
+ if(!(blob instanceof Blob)){return downloadBlobBeforePdfFix(blob,name)}
+ const link=document.createElement('a'),url=URL.createObjectURL(blob);
+ link.href=url;link.download=targetName;link.type=blob.type||'application/pdf';link.style.display='none';
+ document.body.appendChild(link);link.click();link.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),60000);
+};
 
 /* Parent catalog: quiet polling, retry on transport errors, preserve active drafts. */
 function publicCatalogSignature(forms){return JSON.stringify((forms||[]).map(f=>[f.id,f.updatedAt||'',f.title||'',f.description||'',f.sectionCount||0,f.recognizerVersion||'',!!f.hasWordTemplate]).sort((a,b)=>String(a[0]).localeCompare(String(b[0]))))}
