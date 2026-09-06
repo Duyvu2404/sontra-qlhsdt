@@ -1894,7 +1894,7 @@ function jsonp_(callback,value){return ContentService.createTextOutput(callback+
  /* ===== End chỉnh sửa hồ sơ ===== */
 
  /* ===== Google Drive phân cấp · thay thế đúng hồ sơ hiện tại ===== */
-const DRIVE_HIERARCHY_APPS_SCRIPT=String.raw`const API_VERSION='ST SmartForms Drive Hierarchy 7.0.1 · Shared Access 8.0.1 · Recovery 9.0 · Delete Sync 10.2 · Word Upload 11.0 · Public Forms 11.1 · Identity Lookup 12.0.1';
+const DRIVE_HIERARCHY_APPS_SCRIPT=String.raw`const API_VERSION='ST SmartForms Drive Hierarchy 12.2.0 · Hierarchy 7.0.1 compatibility · Shared Access 8.0.1 · Recovery 9.0 · Delete Sync 10.2 · Word/PDF Upload 11.0 · Public Forms 11.1 · Identity Lookup 12.0.1';
 const SYSTEM_ROOT='ST SmartForms - Hồ sơ hành chính';
 const FORM_SOURCE='01 - Biểu mẫu gốc';
 const FORM_RECORDS='02 - Hồ sơ đã tiếp nhận';
@@ -1948,7 +1948,7 @@ function doPost(e){
 function doGet(e){
   const q=e.parameter||{},callback=/^[A-Za-z_$][\w$.]*$/.test(q.callback||'')?q.callback:'cb';
   try{
-    if(q.action==='publicHealth')return jsonp_(callback,{ok:true,apiVersion:API_VERSION,publicUpload:true,wordUpload:true,maxFileMb:10});
+    if(q.action==='publicHealth')return jsonp_(callback,{ok:true,apiVersion:API_VERSION,publicUpload:true,verifiedUpload:true,fileBase64:true,fileName:true,fileMime:true,wordUpload:true,maxFileMb:10});
     if(q.action==='publicCatalog')return jsonp_(callback,{ok:true,apiVersion:API_VERSION,forms:publicCatalog_()});
     if(q.action==='publicRequestStatus')return jsonp_(callback,requestStatus_(q.requestId));
     if(q.action==='adminStatus')return jsonp_(callback,adminAccountStatus_());
@@ -2015,7 +2015,7 @@ function publicUpload_(data,requestId){
     meta.driveSyncStatus='Da chuyen len Drive';meta.driveUploadedAt=new Date().toISOString();meta.formTitle=String(meta.formTitle||cfg.title||'Ho so');
     const base=folder_(cfg.folderUrl),home=formFolder_(base,meta.formId,meta.formTitle,false),existingFolder=home?appFolder_(home,itemKey,meta,false):null,current=readMeta_(existingFolder),sameFirst=!!(current&&Number(current.revision||1)===1&&Number(meta.revision||1)===1&&String(current.submittedAt||'')===String(meta.submittedAt||'')&&String(current.identityHash||'')===String(meta.identityHash||''));
     if(current&&!sameFirst&&!validParentEditToken_(data.editToken,itemKey,current))return requestText_(requestId,false,'parent verification expired');
-    delete meta._parentEditToken;writeApp_(base,itemKey,meta,fileName,b64,data.fileMime||'');saveApplicationIndex_(base,itemKey,meta);
+    delete meta._parentEditToken;meta._driveFileName=fileName;meta.fileMime=String(data.fileMime||'application/pdf');writeApp_(base,itemKey,meta,fileName,b64,data.fileMime||'');saveApplicationIndex_(base,itemKey,meta);
     const nextProof=firstParentProofHash_(meta),nextToken=nextProof?parentEditToken_(itemKey,nextProof):'';
     return requestText_(requestId,true,'synced',{itemKey:itemKey,revision:Number(meta.revision||1),fileName:fileName,editToken:nextToken});
   }finally{lock.releaseLock()}
@@ -2791,7 +2791,7 @@ for(const [name,label] of Object.entries({openPublicForm:'Đang mở biểu mẫ
  window[name]=function(...args){return runUserOperation(label,()=>fn.apply(this,args))};
 }
 const renderDriveBeforeProcessing=renderDrive;
-renderDrive=async function(){await renderDriveBeforeProcessing();const code=$('#driveSharedCode'),copy=$('#copyDriveSharedCode');if(code)code.value=DRIVE_HIERARCHY_APPS_SCRIPT;if(copy)copy.textContent='Sao chép mã Apps Script 12.0.1';const summary=$('#av-drive details>summary b');if(summary)summary.textContent='Cài đặt kỹ thuật (Apps Script 12.0.1)';};
+renderDrive=async function(){await renderDriveBeforeProcessing();const code=$('#driveSharedCode'),copy=$('#copyDriveSharedCode');if(code)code.value=DRIVE_HIERARCHY_APPS_SCRIPT;if(copy)copy.textContent='Sao chép mã Apps Script 12.2.0';const summary=$('#av-drive details>summary b');if(summary)summary.textContent='Cài đặt kỹ thuật (Apps Script 12.2.0)';};
 
 const fillPdfBeforeBinaryFix=fillPdf;
 fillPdf=async function(...args){return cloneBuffer(await fillPdfBeforeBinaryFix(...args))};
