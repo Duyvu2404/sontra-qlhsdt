@@ -2899,5 +2899,264 @@ const parentCatalogLive=(()=>{
  return{start,refresh};
 })();
 
+/* ===== SmartForms 12.0 · nhập mượt, gộp trường trùng tên, phủ trắng dấu chấm dư ===== */
+(function installSmartFormsSmoothFill(){
+
+ /* ---------- 1. Gộp các trường bị trùng tên trong cùng một phần ---------- */
+ function fieldTypeFamily(type){return type==='signature'?'signature':type==='date'?'date':'text'}
+ function fieldGroupKey(field){
+  let label=foldVN(semanticLabel(field&&field.label||'')).replace(/[^a-z0-9]+/g,' ').trim();
+  // Ô trống chưa có tên rõ ràng thì giữ riêng, không gộp nhầm với ô khác.
+  if(!label||label==='truong thong tin')return 'rieng|'+(field&&field.key||'');
+  return [field&&field.sectionId||'',fieldTypeFamily(field&&field.type),label].join('|')
+ }
+ function mergeHead(head,field){
+  if(field.type==='textarea'&&head.type!=='signature')head.type='textarea';
+  if(field.required)head.required=true;
+  let label=semanticLabel(field.label||'');
+  if(label.length>String(head.label||'').length)head.label=label;
+  return head
+ }
+ const aliasCache=new WeakMap();
+ function fieldAliasMap(form){
+  let fields=form&&form.fields||[],stamp=String(form&&form.updatedAt||'')+'|'+fields.length,cached=aliasCache.get(form||{});
+  if(cached&&cached.stamp===stamp)return cached.map;
+  let canonical=new Map(),map=new Map();
+  for(let field of fields){
+   if(field.source!=='custom'||!field.key)continue;
+   let group=fieldGroupKey(field),head=canonical.get(group);
+   if(!head){head={key:field.key,label:semanticLabel(field.label||'')||field.label,type:field.type,required:!!field.required};canonical.set(group,head)}
+   else mergeHead(head,field);
+   map.set(field.key,head)
+  }
+  if(form)aliasCache.set(form,{stamp,map});
+  return map
+ }
+ // Các trường cùng tên dùng chung một ô nhập; giá trị được chép sang mọi vị trí tương ứng trên PDF.
+ function mirrorValues(form,values){
+  let map=fieldAliasMap(form),out=null;
+  for(let [key,head] of map){
+   if(head.key===key)continue;
+   let value=values&&values[head.key];
+   if(value===undefined||value===''||values&&values[key]===value)continue;
+   if(!out)out=Object.assign({},values);
+   out[key]=value
+  }
+  return out||values||{}
+ }
+
+ uniqueInputs=function(fields,section){
+  let seen=new Map();
+  for(let field of (fields||[])){
+   if(field.sectionId!==section.id||field.source!=='custom')continue;
+   let group=fieldGroupKey(field),head=seen.get(group);
+   if(!head)seen.set(group,Object.assign({},field,{label:semanticLabel(field.label||'')||field.label}));
+   else mergeHead(head,field)
+  }
+  return [...seen.values()]
+ };
+
+ const overlayItemsBeforeMerge=overlayItems;
+ overlayItems=function(form,identity,custom,when,imageZoom,imagePosition){
+  return overlayItemsBeforeMerge(form,identity,mirrorValues(form,custom||{}),when||new Date(),mirrorValues(form,imageZoom||{}),imagePosition||{})
+ };
+
+ /* ---------- 2. Đo cỡ chữ có bộ nhớ đệm ---------- */
+ const fittedFontSizeBeforeCache=fittedFontSize,fitCache=new Map();
+ fittedFontSize=function(text,slot){
+  let key=[text,Math.round(Number(slot.fontSize||11)*4),Math.round(Number(slot.width||0)),slot.fontWeight||400,slot.fontStyle||'normal'].join('|');
+  if(fitCache.has(key))return fitCache.get(key);
+  let size=fittedFontSizeBeforeCache(text,slot);
+  if(fitCache.size>4000)fitCache.clear();
+  fitCache.set(key,size);
+  return size
+ };
+
+ /* ---------- 3. Xem trước: vẽ nền PDF một lần, gõ phím chỉ vẽ lại lớp chữ ---------- */
+ const previewIds=new WeakMap();let previewSeq=0;
+ function previewFormId(form){let id=previewIds.get(form);if(!id){id='pv'+(++previewSeq);previewIds.set(form,id)}return id}
+ const session={id:'',target:null,scale:0,pages:[],build:null,buildKey:''};
+
+ async function buildPreviewPages(form,target,id,scale){
+  await ensurePdfRuntime();
+  if(!target.querySelector('.pdf-page-wrap'))target.innerHTML='<div class="notice">Đang dựng bản PDF…</div>';
+  let data=new Uint8Array(cloneBuffer(form.pdfBuffer)),
+      doc=await pdfjsLib.getDocument({data,disableAutoFetch:true,disableStream:true}).promise,
+      fragment=document.createDocumentFragment(),pages=[],
+      ratio=Math.min(window.devicePixelRatio||1,2);
+  for(let number=1;number<=doc.numPages;number++){
+   let page=await doc.getPage(number),viewport=page.getViewport({scale}),
+       wrap=document.createElement('div'),canvas=document.createElement('canvas'),
+       context=canvas.getContext('2d',{alpha:false});
+   wrap.className='pdf-page-wrap';wrap.style.width=viewport.width+'px';wrap.style.height=viewport.height+'px';
+   canvas.width=Math.ceil(viewport.width*ratio);canvas.height=Math.ceil(viewport.height*ratio);
+   canvas.style.width=viewport.width+'px';canvas.style.height=viewport.height+'px';
+   context.setTransform(ratio,0,0,ratio,0,0);
+   await page.render({canvasContext:context,viewport}).promise;
+   try{page.cleanup()}catch{}
+   let layer=document.createElement('div');
+   layer.className='pdf-overlay-layer';
+   layer.style.cssText='position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none';
+   wrap.appendChild(canvas);wrap.appendChild(layer);fragment.appendChild(wrap);
+   pages.push({wrap,layer,width:viewport.width,height:viewport.height,html:''})
+  }
+  target.innerHTML='';target.appendChild(fragment);
+  try{await doc.cleanup()}catch{}
+  try{await doc.destroy()}catch{}
+  Object.assign(session,{id,target,scale,pages});
+  return session
+ }
+
+ async function ensurePreviewPages(form,target){
+  let id=previewFormId(form),scale=Number(state.previewScale)||1.15,key=id+'|'+scale;
+  if(session.id===id&&session.scale===scale&&session.pages.length){
+   // Trang đã dựng sẵn: chỉ gắn lại vào khung, không dựng lại PDF.
+   if(session.target!==target||session.pages[0].wrap.parentNode!==target){
+    target.innerHTML='';
+    for(let page of session.pages)target.appendChild(page.wrap);
+    session.target=target
+   }
+   return session
+  }
+  if(session.build&&session.buildKey===key)return session.build;
+  let build=buildPreviewPages(form,target,id,scale);
+  session.build=build;session.buildKey=key;
+  try{return await build}finally{if(session.build===build){session.build=null;session.buildKey=''}}
+ }
+
+ function overlayHTML(item,page,scale){
+  let x=item.x*scale;
+  if(item.imageData){
+   let top=page.height-(item.y+item.height)*scale,offset=item.imageOffset||{dx:0,dy:0};
+   return `<div class="pdf-signature-drag" data-position-key="${esc(item.positionKey||'')}" title="Giữ và kéo để căn vị trí chữ ký" style="left:${x}px;top:${top}px;width:${item.width*scale}px;height:${item.height*scale}px;background:${item.erase?'#fff':'transparent'};pointer-events:auto"><img src="${esc(item.imageData)}" alt="Chữ ký" style="left:${(Number(offset.dx)||0)*scale}px;top:${(Number(offset.dy)||0)*scale}px;transform:scale(${item.imageZoom||1})"></div>`
+  }
+  let size=item.text?fittedFontSize(item.text,item):Math.max(6,Number(item.fontSize||item.height||11)),
+      ascent=Number.isFinite(item.ascent)?item.ascent:.82,
+      descent=Number.isFinite(item.descent)?item.descent:-.22,
+      top=page.height-(item.y+size*ascent)*scale,
+      height=Math.max(size*(ascent-descent)*scale,size*scale),html='';
+  // Phủ trắng cả vùng chấm còn thừa khi phụ huynh viết ngắn hơn độ dài ô.
+  if(item.erase)html+=`<div style="position:absolute;left:${x-1}px;top:${top-1}px;width:${item.width*scale+2}px;height:${height+2}px;background:#fff"></div>`;
+  if(!item.text)return html;
+  return html+`<div class="pdf-overlay" style="left:${x+1}px;top:${top}px;width:${item.width*scale}px;font-size:${size*scale}px;line-height:1;font-family:'Times New Roman',Times,serif;font-weight:${item.fontWeight||400};font-style:${item.fontStyle||'normal'};color:${item.color||'#111'}">${esc(item.text)}</div>`
+ }
+
+ function paintPreviewOverlay(form,identity,custom,imageZoom,imagePosition){
+  if(!session.pages.length)return;
+  let scale=session.scale,
+      items=overlayItems(form,identity,custom,new Date(),imageZoom,imagePosition),
+      html=session.pages.map(()=>'');
+  for(let item of items){
+   let index=(item.page|0)-1,page=session.pages[index];
+   if(!page)continue;
+   html[index]+=overlayHTML(item,page,scale)
+  }
+  session.pages.forEach((page,index)=>{if(page.html!==html[index]){page.layer.innerHTML=html[index];page.html=html[index]}})
+ }
+
+ function installSignatureDrag(target){
+  if(!target||target.dataset.sfDrag)return;
+  target.dataset.sfDrag='1';
+  let drag=null;
+  target.addEventListener('pointerdown',event=>{
+   let clip=event.target.closest&&event.target.closest('.pdf-signature-drag');
+   if(!clip||event.pointerType==='mouse'&&event.button!==0)return;
+   let key=clip.dataset.positionKey;if(!key)return;
+   event.preventDefault();
+   let saved=state.imagePosition[key]||{},scale=session.scale||1;
+   try{clip.setPointerCapture(event.pointerId)}catch{}
+   drag={id:event.pointerId,clip,image:clip.querySelector('img'),key,scale,
+         x:event.clientX,y:event.clientY,dx:Number(saved.dx)||0,dy:Number(saved.dy)||0,
+         maxX:parseFloat(clip.style.width)/scale*.55,maxY:parseFloat(clip.style.height)/scale*.55};
+   clip.classList.add('dragging')
+  });
+  target.addEventListener('pointermove',event=>{
+   if(!drag||drag.id!==event.pointerId)return;
+   let dx=Math.max(-drag.maxX,Math.min(drag.maxX,drag.dx+(event.clientX-drag.x)/drag.scale)),
+       dy=Math.max(-drag.maxY,Math.min(drag.maxY,drag.dy+(event.clientY-drag.y)/drag.scale));
+   state.imagePosition[drag.key]={dx,dy};
+   if(drag.image){drag.image.style.left=(dx*drag.scale)+'px';drag.image.style.top=(dy*drag.scale)+'px'}
+  });
+  let stop=event=>{
+   if(!drag||drag.id!==event.pointerId)return;
+   try{drag.clip.releasePointerCapture(event.pointerId)}catch{}
+   drag.clip.classList.remove('dragging');
+   drag=null;
+   session.pages.forEach(page=>{page.html=''});
+   queuePreview()
+  };
+  target.addEventListener('pointerup',stop);
+  target.addEventListener('pointercancel',stop)
+ }
+
+ renderPdfPreview=async function(form,identity,custom,target,imageZoom,imagePosition){
+  if(!form||!target)return;
+  await ensurePreviewPages(form,target);
+  installSignatureDrag(target);
+  paintPreviewOverlay(form,identity||{},custom||{},imageZoom||state.imageZoom||{},imagePosition||state.imagePosition||{})
+ };
+
+ const queuePreviewBeforeSmooth=queuePreview;
+ let smoothTimer=null,smoothBusy=false,smoothAgain=false;
+ async function drawPreviewNow(){
+  if(!state.currentForm)return;
+  if(smoothBusy){smoothAgain=true;return}
+  smoothBusy=true;smoothAgain=false;
+  let target=$('#pdfPreview');
+  try{if(target)await renderPdfPreview(state.currentForm,state.identity,state.custom,target,state.imageZoom,state.imagePosition)}
+  catch(error){if(target)target.innerHTML=`<div class="notice bad">${esc(error.message)}</div>`}
+  finally{smoothBusy=false;if(smoothAgain)requestAnimationFrame(drawPreviewNow)}
+ }
+ queuePreview=function(){
+  queuePreviewBeforeSmooth();
+  clearTimeout(smoothTimer);
+  smoothTimer=setTimeout(()=>requestAnimationFrame(drawPreviewNow),80)
+ };
+
+ /* ---------- 4. PDF tải về: phủ trắng mọi dấu chấm của trường đã điền ---------- */
+ async function fillPdfCoveringDots(form,identity,custom,when=new Date(),imageZoom=state.imageZoom||{},imagePosition=state.imagePosition||{}){
+  await ensurePdfLib();
+  let pdf=await PDFLib.PDFDocument.load(form.pdfBuffer.slice(0)),
+      pages=pdf.getPages(),
+      items=overlayItems(form,identity,custom,when,imageZoom,imagePosition);
+  for(let item of items){
+   let page=pages[item.page-1];
+   if(!page)continue;
+   if(item.imageData){
+    let cropped=await signaturePngPositioned(item.imageData,item.width,item.height,item.imageZoom||1,item.imageOffset||{}),
+        image=await pdf.embedPng(cropped);
+    if(item.erase)page.drawRectangle({x:item.x,y:item.y,width:item.width,height:item.height,color:PDFLib.rgb(1,1,1)});
+    page.drawImage(image,{x:item.x,y:item.y,width:item.width,height:item.height});
+    continue
+   }
+   let size=item.text?fittedFontSize(item.text,item):Math.max(6,Number(item.fontSize||item.height||11)),
+       ascent=Number.isFinite(item.ascent)?item.ascent:.82,
+       descent=Number.isFinite(item.descent)?item.descent:-.22;
+   // Vẽ nền trắng trước, kể cả dòng nối không còn chữ, để không sót dấu chấm.
+   if(item.erase)page.drawRectangle({x:item.x-.8,y:item.y+size*descent-1,width:item.width+1.6,height:size*(ascent-descent)+2,color:PDFLib.rgb(1,1,1)});
+   if(!item.text)continue;
+   let raster=textPng(item.text,size,item),png=await pdf.embedPng(raster.url),width=raster.width,height=raster.height;
+   if(width>item.width){let scale=item.width/width;width*=scale;height*=scale}
+   let baselineBottom=raster.baselineFromBottom*(height/raster.height);
+   page.drawImage(png,{x:item.x+.6,y:item.y-baselineBottom,width,height})
+  }
+  return await pdf.save()
+ }
+ fillPdf=async function(...args){return cloneBuffer(await fillPdfCoveringDots(...args))};
+
+ /* ---------- 5. Quét PDF mới: đặt mã trường theo tên để không sinh trùng ---------- */
+ const classifyBeforeStableKey=classify;
+ classify=function(label,lineText,title,meta){
+  let result=classifyBeforeStableKey(label,lineText,title,meta);
+  if(result&&result.source==='custom'&&/^field_[a-z0-9]{4,8}$/.test(String(result.key||''))){
+   let slug=foldVN(semanticLabel(result.label||label||'')).replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'').slice(0,40);
+   if(slug)result.key='field_'+slug
+  }
+  return result
+ };
+
+})();
+/* ===== Kết thúc SmartForms 12.0 ===== */
+
 (async()=>{installAdminSession();await openDB();renderLookup();await renderPublicForms();cleanNotes();restoreUiSession();setTimeout(()=>{if(isParentPortal())parentCatalogLive.start();else bootstrapPublicService().then(()=>renderPublicForms()).catch(error=>console.warn('Không cập nhật được danh sách biểu mẫu:',error.message))},0)})().catch(e=>alert('Không khởi động được hệ thống: '+e.message));
 </script></body></html>
