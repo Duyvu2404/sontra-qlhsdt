@@ -1894,7 +1894,7 @@ function jsonp_(callback,value){return ContentService.createTextOutput(callback+
  /* ===== End chỉnh sửa hồ sơ ===== */
 
  /* ===== Google Drive phân cấp · thay thế đúng hồ sơ hiện tại ===== */
-const DRIVE_HIERARCHY_APPS_SCRIPT=String.raw`const API_VERSION='ST SmartForms Drive Hierarchy 12.2.0 · Hierarchy 7.0.1 compatibility · Shared Access 8.0.1 · Recovery 9.0 · Delete Sync 10.2 · Word/PDF Upload 11.0 · Public Forms 11.1 · Identity Lookup 12.0.1';
+const DRIVE_HIERARCHY_APPS_SCRIPT=String.raw`const API_VERSION='ST SmartForms Drive Hierarchy 12.2.0 · Hierarchy 7.0.1 compatibility · Shared Access 8.0.1 · Recovery 9.0 · Delete Sync 10.2 · Word/PDF Upload 11.0 · Public Forms 11.1 · Identity Lookup 12.0.1 · Record Delete 13.0';
 const SYSTEM_ROOT='ST SmartForms - Hồ sơ hành chính';
 const FORM_SOURCE='01 - Biểu mẫu gốc';
 const FORM_RECORDS='02 - Hồ sơ đã tiếp nhận';
@@ -1940,6 +1940,13 @@ function doPost(e){
       PropertiesService.getScriptProperties().deleteProperty('PUBLIC_FORM_'+formId);
       if(home)home.setTrashed(true);
       return requestText_(requestId,true,'form moved to trash',{formId:formId,deleted:!!home});
+    }
+    if(data.action==='driveDeleteApp'){
+      const base=folder_(data.folder),formId=safe_(data.formId),itemKey=safe_(data.itemKey);
+      const home=formFolder_(base,formId,'',false),item=home?appFolder_(home,itemKey,{},false):null;
+      if(data.code)PropertiesService.getScriptProperties().deleteProperty(applicationCodeKey_(String(data.code)));
+      if(item)item.setTrashed(true);
+      return requestText_(requestId,true,'application moved to trash',{itemKey:itemKey,deleted:!!item});
     }
     return requestText_(requestId,false,'invalid action');
   }catch(err){return requestText_(requestId,false,errorText_(err))}
@@ -3159,4 +3166,331 @@ const parentCatalogLive=(()=>{
 /* ===== Kết thúc SmartForms 12.0 ===== */
 
 (async()=>{installAdminSession();await openDB();renderLookup();await renderPublicForms();cleanNotes();restoreUiSession();setTimeout(()=>{if(isParentPortal())parentCatalogLive.start();else bootstrapPublicService().then(()=>renderPublicForms()).catch(error=>console.warn('Không cập nhật được danh sách biểu mẫu:',error.message))},0)})().catch(e=>alert('Không khởi động được hệ thống: '+e.message));
+
+/* ===== SmartForms 13.0 · gọn giao diện · cập nhật nhanh · xóa hồ sơ kèm Drive · rút gọn link ===== */
+(function installSmartForms13(){
+'use strict';
+
+/* ---------- 0. CSS bổ sung ---------- */
+(function css(){
+ if(document.getElementById('sf13Style'))return;
+ const st=document.createElement('style');st.id='sf13Style';
+ st.textContent=`
+.sf13-fold{border:1px solid var(--line);border-radius:14px;background:#fff;padding:0 16px;margin:14px 0}
+.sf13-fold>summary{cursor:pointer;list-style:none;padding:13px 0;font-weight:800;color:#3d4b63;font-size:.92rem;display:flex;align-items:center;gap:8px}
+.sf13-fold>summary::-webkit-details-marker{display:none}
+.sf13-fold>summary::before{content:'▸';font-size:.9rem;color:var(--pri)}
+.sf13-fold[open]>summary::before{content:'▾'}
+.sf13-fold>.sf13-body{padding:0 0 16px;display:grid;gap:16px}
+.sf13-quiet{background:#f6f9fc;border:1px dashed var(--line)}
+.sf13-linkbox{margin-top:14px;padding:15px;border:1px solid var(--line);border-radius:14px;background:#f8fbff}
+.sf13-linkbox b{display:block;margin-bottom:9px}
+.sf13-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.sf13-row input{flex:1;min-width:220px}
+.sf13-short{font-weight:800;color:#0d5365;word-break:break-all}
+.sf13-hint{font-size:12px;color:#6a788f;margin-top:8px;line-height:1.6}
+.sf13-refresh{margin:0 0 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.sf13-refresh small{color:#6a788f}
+@media(max-width:600px){.sf13-row input{min-width:100%}}
+`;
+ document.head.appendChild(st);
+})();
+
+const isParent=()=>{try{return !!(window.isParentPortal&&window.isParentPortal())}catch{return false}};
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+async function sfCopy(text){try{await navigator.clipboard.writeText(text);return true}catch{const ta=document.createElement('textarea');ta.value=text;ta.style.cssText='position:fixed;opacity:0';document.body.appendChild(ta);ta.select();let ok=false;try{ok=document.execCommand('copy')}catch{}ta.remove();return ok}}
+
+/* ================================================================
+   1. GIAO DIỆN: gom hướng dẫn vào một khối mở/đóng, bớt rối
+   ================================================================ */
+function tidyAdminHome(){
+ const welcome=document.querySelector('#page-home .admin-welcome');
+ if(!welcome||welcome.dataset.sf13)return;
+ welcome.dataset.sf13='1';
+ const heads=[...welcome.querySelectorAll(':scope > .sectionHead')];
+ const parts=[welcome.querySelector(':scope > .guide-links'),welcome.querySelector('#operationGuide'),heads[heads.length-1],welcome.querySelector(':scope > .guide-sections'),welcome.querySelector(':scope > .daily-flow'),welcome.querySelector(':scope > .password-plain-note')].filter(Boolean);
+ if(!parts.length)return;
+ const fold=document.createElement('details');
+ fold.className='sf13-fold';
+ fold.innerHTML='<summary>Hướng dẫn sử dụng chi tiết (mở khi cần)</summary><div class="sf13-body"></div>';
+ const body=fold.querySelector('.sf13-body');
+ welcome.appendChild(fold);
+ parts.forEach(el=>body.appendChild(el));
+ const guideBtn=[...welcome.querySelectorAll('.welcome-hero .btn')].find(b=>/hướng dẫn/i.test(b.textContent||''));
+ if(guideBtn){guideBtn.onclick=e=>{e.preventDefault();fold.open=true;fold.scrollIntoView({behavior:'smooth',block:'start'})}}
+}
+
+function tidyAdminPanes(){
+ document.querySelectorAll('#adminApp .admin-help').forEach(box=>{
+  if(box.dataset.sf13)return;box.dataset.sf13='1';box.classList.add('sf13-quiet');
+  box.style.fontSize='12.5px';box.style.lineHeight='1.6';box.style.opacity='.9';
+ });
+ const drive=document.querySelector('#av-drive');
+ if(drive)[...drive.querySelectorAll('.section-box')].forEach(box=>{
+  if(box.dataset.sf13)return;
+  if(!/Cấu trúc/i.test(box.textContent||''))return;
+  box.dataset.sf13='1';
+  const fold=document.createElement('details');fold.className='sf13-fold';
+  fold.innerHTML='<summary>Cấu trúc thư mục trên Google Drive</summary><div class="sf13-body"></div>';
+  box.parentNode.insertBefore(fold,box);
+  fold.querySelector('.sf13-body').appendChild(box);
+  box.style.margin='0';box.style.border='0';box.style.padding='0';box.style.background='transparent';
+ });
+}
+
+/* ================================================================
+   2. KẾT NỐI APPS SCRIPT (bản dùng chung cho khối này)
+   ================================================================ */
+const SF13_EXEC=/^https:\/\/script\.google\.com\/macros\/s\/[-\w]+\/exec\/?$/i;
+async function sf13Config(){
+ const d=await idbGet('settings','drive')||{};
+ const endpoint=String(d.appsScriptUrl||'').trim().replace(/\/+$/,'');
+ const token=String(d.appsScriptToken||'').trim();
+ const folder=String(d.folderUrl||'')||Object.values(d.formFolders||{}).filter(Boolean)[0]||'';
+ if(!SF13_EXEC.test(endpoint))throw new Error('Chưa có URL Apps Script hợp lệ. Vào mục “Kết nối Drive” để nhập lại.');
+ if(!token)throw new Error('Chưa có mã kết nối hệ thống (SMARTFORMS_DRIVE_TOKEN).');
+ if(!folder)throw new Error('Chưa có link thư mục mẹ Google Drive.');
+ return{endpoint,token,folder,settings:d};
+}
+async function sf13Post(payload,timeout=90000){
+ const c=await sf13Config();
+ const requestId='sf13_'+Date.now().toString(36)+Math.random().toString(36).slice(2,9);
+ const started=Date.now();
+ try{
+  await fetch(c.endpoint,{method:'POST',mode:'no-cors',cache:'no-store',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({...payload,token:c.token,requestId})});
+ }catch{throw new Error('Không gửi được yêu cầu tới Apps Script. Kiểm tra mạng và URL kết thúc bằng /exec.')}
+ let attempt=0,lastError='';
+ while(Date.now()-started<timeout){
+  await wait(Math.min(400+attempt*450,2200));attempt++;
+  try{
+   const r=await jsonp(c.endpoint,{action:'requestStatus',token:c.token,requestId},25000);
+   if(!r.ok)throw new Error(r.error||'Không đọc được trạng thái Apps Script.');
+   if(r.pending)continue;
+   if(r.result&&r.result.ok)return r.result;
+   throw new Error((r.result&&r.result.message)||'Apps Script từ chối yêu cầu.');
+  }catch(error){
+   const m=String(error&&error.message||error);
+   if(/từ chối|unauthorized|permission|invalid action|không hợp lệ/i.test(m))throw error;
+   lastError=m;
+  }
+ }
+ throw new Error(lastError||'Apps Script chưa xác nhận kết quả. Hãy kiểm tra lại trên Drive.');
+}
+
+/* ================================================================
+   3. XÓA HỒ SƠ: web + Google Drive cùng lúc
+   ================================================================ */
+async function sf13DeleteOnDrive(app){
+ const c=await sf13Config();
+ const folder=c.folder||app.driveFolderUrl||'';
+ await sf13Post({action:'driveDeleteApp',folder,formId:String(app.formId||''),itemKey:String(app.id||''),code:String(app.code||'')},90000);
+}
+
+window.deleteApplication=async function(id){
+ const app=await idbGet('apps',id);
+ if(!app){alert('Không tìm thấy hồ sơ này.');return false}
+ const name=(app.identity&&app.identity.studentName)||app.code||'hồ sơ';
+ if(!confirm('Xóa hồ sơ “'+name+'” ('+(app.code||'')+')?\n\n• Hồ sơ bị gỡ khỏi website.\n• Thư mục hồ sơ tương ứng được chuyển vào Thùng rác Google Drive.\n\nThao tác này không tự hoàn tác được từ website.'))return false;
+ const run=async()=>{
+  let driveError='';
+  try{await sf13DeleteOnDrive(app)}catch(error){driveError=String(error&&error.message||error)}
+  if(driveError){
+   if(!confirm('Chưa xóa được trên Google Drive:\n'+driveError+'\n\nVẫn xóa hồ sơ khỏi website? (Bản trên Drive sẽ phải xóa thủ công)'))return false;
+  }
+  await idbDel('apps',id);
+  try{closeModal()}catch{}
+  try{await renderRecords()}catch{}
+  try{await renderDashboard()}catch{}
+  alert(driveError?'Đã xóa hồ sơ khỏi website. Bản trên Google Drive cần xóa thủ công.':'Đã xóa hồ sơ khỏi website và chuyển thư mục hồ sơ vào Thùng rác Google Drive.');
+  return true;
+ };
+ return typeof runUserOperation==='function'?runUserOperation('Đang xóa hồ sơ trên website và Google Drive…',run):run();
+};
+
+/* Gắn lại nút Xóa trong cửa sổ chi tiết hồ sơ */
+const viewAppBefore13=viewApp;
+viewApp=async function(id){
+ const result=await viewAppBefore13(id);
+ for(const sel of ['#deleteApp','#adminDeleteWordApp']){
+  const button=document.querySelector(sel);
+  if(!button)continue;
+  button.textContent='Xóa hồ sơ (kèm Drive)';
+  button.onclick=()=>window.deleteApplication(id);
+ }
+ return result;
+};
+
+/* Thêm nút Xóa cho từng thẻ hồ sơ trong danh sách */
+function injectRecordDeleteButtons(){
+ document.querySelectorAll('#av-records .student-foot .actions').forEach(actions=>{
+  if(actions.querySelector('[data-sf13-del]'))return;
+  const view=[...actions.querySelectorAll('button')].find(b=>/viewApp\(/.test(b.getAttribute('onclick')||''));
+  if(!view)return;
+  const m=(view.getAttribute('onclick')||'').match(/viewApp\(\s*'([^']+)'/);
+  if(!m)return;
+  const button=document.createElement('button');
+  button.className='btn danger';button.type='button';button.dataset.sf13Del=m[1];button.textContent='Xóa';
+  button.onclick=()=>window.deleteApplication(m[1]);
+  actions.appendChild(button);
+ });
+}
+
+/* ================================================================
+   4. RÚT GỌN LINK GỬI PHỤ HUYNH
+   ================================================================ */
+function sf13CleanAlias(value){return String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').replace(/Đ/g,'D').toLowerCase().replace(/[^a-z0-9_]+/g,'').slice(0,30)}
+async function sf13Shorten(longUrl,alias){
+ const services=[
+  {name:'is.gd',url:'https://is.gd/create.php?format=json&url='},
+  {name:'v.gd',url:'https://v.gd/create.php?format=json&url='}
+ ];
+ let last='';
+ for(const service of services){
+  let target=service.url+encodeURIComponent(longUrl);
+  if(alias)target+='&shorturl='+encodeURIComponent(alias);
+  try{
+   const response=await fetch(target,{cache:'no-store'});
+   const data=await response.json().catch(()=>({}));
+   if(data&&data.shorturl)return String(data.shorturl);
+   last=String((data&&data.errormessage)||'Dịch vụ '+service.name+' không trả về link.');
+   if(/already exists|taken|đã tồn tại/i.test(last))throw new Error('Tên link “'+alias+'” đã có người dùng. Hãy chọn tên khác.');
+  }catch(error){
+   last=String(error&&error.message||error);
+   if(/đã có người dùng/.test(last))throw error;
+  }
+ }
+ throw new Error(last||'Không rút gọn được link. Có thể mạng của trường đang chặn dịch vụ rút gọn; hãy tự tạo link ngắn rồi dán vào ô bên dưới.');
+}
+async function sf13SaveShortLink(patch){
+ const current=await idbGet('settings','drive')||{id:'drive'};
+ const next={...current,id:'drive',...patch};
+ await idbPut('settings',next);
+ return next;
+}
+
+async function injectShortLinkPanel(){
+ const source=document.querySelector('#parentShareLink');
+ const pane=document.querySelector('#av-drive');
+ if(!pane||!source)return;
+ if(pane.querySelector('#sf13ShortPanel'))return;
+ const settings=await idbGet('settings','drive')||{};
+ const saved=String(settings.parentShortLink||'');
+ const alias=String(settings.parentShortName||'');
+ const host=source.closest('.link-box')||source.parentElement;
+ const panel=document.createElement('div');
+ panel.className='sf13-linkbox';panel.id='sf13ShortPanel';
+ panel.innerHTML=
+  '<b>Link rút gọn gửi phụ huynh</b>'+
+  '<div class="sf13-row"><input id="sf13Alias" maxlength="30" placeholder="Tên link mong muốn, ví dụ: hosotruongabc" value="'+esc(alias)+'">'+
+  '<button class="btn primary" type="button" id="sf13Make">Tạo link ngắn</button></div>'+
+  '<div class="sf13-hint">Tên link chỉ dùng chữ thường, số và dấu gạch dưới, từ 5–30 ký tự. Để trống thì hệ thống tự sinh tên ngẫu nhiên.</div>'+
+  '<div class="sf13-row" style="margin-top:12px"><input id="sf13Short" placeholder="Hoặc dán sẵn link ngắn tự tạo…" value="'+esc(saved)+'">'+
+  '<button class="btn secondary" type="button" id="sf13CopyShort">Sao chép</button>'+
+  '<button class="btn ghost" type="button" id="sf13SaveShort">Lưu link</button></div>'+
+  '<div class="sf13-hint" id="sf13ShortMsg">'+(saved?'Link đang dùng: <span class="sf13-short">'+esc(saved)+'</span>':'Chưa có link rút gọn. Link dài phía trên vẫn dùng được bình thường.')+'</div>';
+ host.insertAdjacentElement('afterend',panel);
+
+ const msg=panel.querySelector('#sf13ShortMsg');
+ const shortInput=panel.querySelector('#sf13Short');
+ const aliasInput=panel.querySelector('#sf13Alias');
+
+ panel.querySelector('#sf13Make').onclick=async()=>{
+  const button=panel.querySelector('#sf13Make');
+  const longUrl=String(source.value||'').trim();
+  if(!longUrl){msg.innerHTML='Chưa có link phụ huynh để rút gọn. Hãy hoàn tất phần kết nối phía trên trước.';return}
+  let wanted=sf13CleanAlias(aliasInput.value);
+  if(aliasInput.value.trim()&&wanted.length<5){msg.innerHTML='Tên link phải từ 5 ký tự trở lên (chữ thường, số, gạch dưới).';return}
+  button.disabled=true;button.textContent='Đang tạo…';msg.textContent='Đang gửi yêu cầu rút gọn…';
+  try{
+   const short=await sf13Shorten(longUrl,wanted);
+   shortInput.value=short;aliasInput.value=wanted;
+   await sf13SaveShortLink({parentShortLink:short,parentShortName:wanted,parentShortSource:longUrl,parentShortAt:nowISO()});
+   msg.innerHTML='Đã tạo xong. Link gửi phụ huynh: <span class="sf13-short">'+esc(short)+'</span>';
+  }catch(error){
+   msg.innerHTML='<span style="color:var(--bad)">'+esc(String(error&&error.message||error))+'</span>';
+  }finally{button.disabled=false;button.textContent='Tạo link ngắn'}
+ };
+ panel.querySelector('#sf13SaveShort').onclick=async()=>{
+  const value=String(shortInput.value||'').trim();
+  if(value&&!/^https?:\/\//i.test(value)){msg.innerHTML='<span style="color:var(--bad)">Link phải bắt đầu bằng http:// hoặc https://</span>';return}
+  await sf13SaveShortLink({parentShortLink:value,parentShortName:sf13CleanAlias(aliasInput.value),parentShortSource:String(source.value||''),parentShortAt:nowISO()});
+  msg.innerHTML=value?'Đã lưu link gửi phụ huynh: <span class="sf13-short">'+esc(value)+'</span>':'Đã xóa link rút gọn. Hãy dùng link dài phía trên.';
+ };
+ panel.querySelector('#sf13CopyShort').onclick=async()=>{
+  const button=panel.querySelector('#sf13CopyShort');
+  const value=String(shortInput.value||'').trim()||String(source.value||'');
+  if(!value)return;
+  button.textContent=await sfCopy(value)?'Đã sao chép':'Không sao chép được';
+  setTimeout(()=>{button.textContent='Sao chép'},1800);
+ };
+}
+
+
+/* ================================================================
+   5. GIẢM ĐỘ TRỄ CẬP NHẬT BÊN PHỤ HUYNH
+   ================================================================ */
+const SF13_PARENT_POLL=10000;
+let parentSyncStarted=false;
+function installParentFastSync(){
+ if(!isParent())return;
+ let live=null;
+ try{live=parentCatalogLive}catch{live=null}
+ const ping=()=>{if(document.hidden||navigator.onLine===false)return;try{live&&live.refresh()}catch{}};
+ if(live&&!parentSyncStarted){
+  parentSyncStarted=true;
+  setInterval(ping,SF13_PARENT_POLL);
+  window.addEventListener('focus',ping);
+  window.addEventListener('online',ping);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)ping()});
+ }
+ // Nút cập nhật thủ công ngay trên danh sách biểu mẫu
+ const list=document.querySelector('#publicForms');
+ if(list&&!document.querySelector('#sf13ParentRefresh')){
+  const bar=document.createElement('div');
+  bar.className='sf13-refresh';bar.id='sf13ParentRefreshBar';
+  bar.innerHTML='<button class="btn secondary" type="button" id="sf13ParentRefresh">Cập nhật ngay</button><small id="sf13ParentRefreshAt">Danh sách tự làm mới mỗi '+(SF13_PARENT_POLL/1000)+' giây.</small>';
+  list.insertAdjacentElement('beforebegin',bar);
+  bar.querySelector('#sf13ParentRefresh').onclick=async()=>{
+   const button=bar.querySelector('#sf13ParentRefresh'),stamp=bar.querySelector('#sf13ParentRefreshAt');
+   button.disabled=true;button.textContent='Đang cập nhật…';
+   try{live&&await live.refresh(true)}catch{}
+   button.disabled=false;button.textContent='Cập nhật ngay';
+   stamp.textContent='Đã cập nhật lúc '+new Date().toLocaleTimeString('vi-VN');
+  };
+ }
+ // Nút cập nhật trạng thái hồ sơ đã tra cứu
+ const lookup=document.querySelector('#page-lookup .card.panel');
+ if(lookup&&!document.querySelector('#sf13LookupRefresh')){
+  const button=document.createElement('button');
+  button.className='btn secondary';button.type='button';button.id='sf13LookupRefresh';
+  button.textContent='Cập nhật trạng thái hồ sơ';button.style.marginTop='14px';
+  button.onclick=()=>{const form=document.querySelector('#lookupForm');if(form&&form.requestSubmit)form.requestSubmit()};
+  lookup.appendChild(button);
+ }
+}
+
+/* ================================================================
+   6. Theo dõi DOM để gắn lại các phần tử sau mỗi lần render
+   ================================================================ */
+let tidyTimer=null;
+function scheduleTidy(){
+ clearTimeout(tidyTimer);
+ tidyTimer=setTimeout(()=>{
+  try{tidyAdminHome()}catch{}
+  try{tidyAdminPanes()}catch{}
+  try{injectRecordDeleteButtons()}catch{}
+  try{installParentFastSync()}catch{}
+  injectShortLinkPanel().catch(()=>{});
+ },60);
+}
+function boot(){
+ scheduleTidy();
+ const root=document.querySelector('main.wrap')||document.body;
+ new MutationObserver(scheduleTidy).observe(root,{childList:true,subtree:true});
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
+
+})();
+/* ===== Kết thúc SmartForms 13.0 ===== */
+
 </script></body></html>
