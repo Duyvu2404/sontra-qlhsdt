@@ -7,7 +7,6 @@
 <meta name="color-scheme" content="light">
 <title>ST SmartForms — Hệ thống quản lý hồ sơ trực tuyến</title>
 <meta name="description" content="Hệ thống tiếp nhận, quản lý và tra cứu hồ sơ trực tuyến dành cho nhà trường.">
-<!-- Bộ xử lý PDF được tải khi người dùng thật sự mở hoặc tạo PDF để trang khởi động nhanh hơn. -->
 <style>
 :root{--bg:#f4f7fb;--card:#fff;--text:#172033;--muted:#738096;--line:#e4e9f2;--pri:#2256d8;--pri2:#5f82eb;--ok:#13856f;--warn:#9b6813;--bad:#c23838;--shadow:0 18px 55px rgba(24,40,75,.10);--r:20px}
 *{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial;color:var(--text);background:linear-gradient(#f8faff,#f2f6fb)}button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:none!important}.muted{color:var(--muted)}
@@ -1894,7 +1893,7 @@ function jsonp_(callback,value){return ContentService.createTextOutput(callback+
  /* ===== End chỉnh sửa hồ sơ ===== */
 
  /* ===== Google Drive phân cấp · thay thế đúng hồ sơ hiện tại ===== */
-const DRIVE_HIERARCHY_APPS_SCRIPT=String.raw`const API_VERSION='ST SmartForms Drive Hierarchy 12.2.0 · Hierarchy 7.0.1 compatibility · Shared Access 8.0.1 · Recovery 9.0 · Delete Sync 10.2 · Word/PDF Upload 11.0 · Public Forms 11.1 · Identity Lookup 12.0.1 · Record Delete 13.0';
+const DRIVE_HIERARCHY_APPS_SCRIPT=String.raw`const API_VERSION='ST SmartForms Drive Hierarchy 12.2.0 · Hierarchy 7.0.1 compatibility · Shared Access 8.0.1 · Recovery 9.0 · Delete Sync 10.2 · Word/PDF Upload 11.0 · Public Forms 11.1 · Identity Lookup 12.0.1 · Record Delete 13.0 · Fast Sync 14.0';
 const SYSTEM_ROOT='ST SmartForms - Hồ sơ hành chính';
 const FORM_SOURCE='01 - Biểu mẫu gốc';
 const FORM_RECORDS='02 - Hồ sơ đã tiếp nhận';
@@ -1938,14 +1937,14 @@ function doPost(e){
     if(data.action==='driveDeleteForm'){
       const base=folder_(data.folder),formId=safe_(data.formId),home=formFolder_(base,formId,'',false);
       PropertiesService.getScriptProperties().deleteProperty('PUBLIC_FORM_'+formId);
-      if(home)home.setTrashed(true);
+      if(home)home.setTrashed(true);bumpDriveList_(base);
       return requestText_(requestId,true,'form moved to trash',{formId:formId,deleted:!!home});
     }
     if(data.action==='driveDeleteApp'){
       const base=folder_(data.folder),formId=safe_(data.formId),itemKey=safe_(data.itemKey);
       const home=formFolder_(base,formId,'',false),item=home?appFolder_(home,itemKey,{},false):null;
       if(data.code)PropertiesService.getScriptProperties().deleteProperty(applicationCodeKey_(String(data.code)));
-      if(item)item.setTrashed(true);
+      if(item)item.setTrashed(true);bumpDriveList_(base);
       return requestText_(requestId,true,'application moved to trash',{itemKey:itemKey,deleted:!!item});
     }
     return requestText_(requestId,false,'invalid action');
@@ -1993,7 +1992,7 @@ function doGet(e){
       const home=formFolder_(base,q.formId||(q.kind==='form'?q.itemKey:''),'',false),item=q.kind==='form'?(home?findChild_(home,FORM_SOURCE):null):(home?appFolder_(home,q.itemKey,{},false):null),meta=item?readMeta_(item):null,file=meta?(q.kind==='form'?readPdf_(item,meta._drivePdfName):readRecordFile_(item,meta)):null;
       return jsonp_(callback,{ok:true,exists:!!(item&&meta&&file),revision:Number(meta&&meta.revision||0),fileName:file?file.getName():''});
     }
-    if(q.action==='driveList'){const out=[];listHierarchy_(base,out);return jsonp_(callback,{ok:true,items:out,systemFolder:SYSTEM_ROOT})}
+    if(q.action==='driveList')return jsonp_(callback,driveListFast_(base,q));
     if(q.action==='driveItem'){
       const home=formFolder_(base,q.formId||(q.kind==='form'?q.itemKey:''),'',false),item=q.kind==='form'?(home?findChild_(home,FORM_SOURCE):null):(home?appFolder_(home,q.itemKey,{},false):null);
       if(!item)return jsonp_(callback,{ok:false,error:'not found'});
@@ -2016,29 +2015,31 @@ function publicUpload_(data,requestId){
   if(bytes.length>10*1024*1024)return requestText_(requestId,false,'file too large');
   if(/\.pdf$/i.test(fileName)&&String.fromCharCode.apply(null,bytes.slice(0,5).map(x=>x&255))!=='%PDF-')return requestText_(requestId,false,'invalid pdf data');
   const meta=JSON.parse(data.metaJson||'{}');if(String(meta.formId||'')!==String(cfg.formId||''))return requestText_(requestId,false,'form mismatch');
-  const lock=LockService.getScriptLock();if(!lock.tryLock(30000))return requestText_(requestId,false,'service busy');
+  const cache=CacheService.getScriptCache(),rateKey='UPLOAD_'+safe_(cfg.formId),count=Number(cache.get(rateKey)||0);if(count>=240)return requestText_(requestId,false,'rate limited');cache.put(rateKey,String(count+1),60);
+  meta.driveSyncStatus='Da chuyen len Drive';meta.driveUploadedAt=new Date().toISOString();meta.formTitle=String(meta.formTitle||cfg.title||'Ho so');
+  const lock=LockService.getScriptLock();if(!lock.tryLock(50000))return requestText_(requestId,false,'service busy');
+  let base;
   try{
-    const cache=CacheService.getScriptCache(),rateKey='UPLOAD_'+safe_(cfg.formId),count=Number(cache.get(rateKey)||0);if(count>=80)return requestText_(requestId,false,'rate limited');cache.put(rateKey,String(count+1),60);
-    meta.driveSyncStatus='Da chuyen len Drive';meta.driveUploadedAt=new Date().toISOString();meta.formTitle=String(meta.formTitle||cfg.title||'Ho so');
-    const base=folder_(cfg.folderUrl),home=formFolder_(base,meta.formId,meta.formTitle,false),existingFolder=home?appFolder_(home,itemKey,meta,false):null,current=readMeta_(existingFolder),sameFirst=!!(current&&Number(current.revision||1)===1&&Number(meta.revision||1)===1&&String(current.submittedAt||'')===String(meta.submittedAt||'')&&String(current.identityHash||'')===String(meta.identityHash||''));
+    base=folder_(cfg.folderUrl);
+    const home=formFolder_(base,meta.formId,meta.formTitle,true),existingFolder=appFolder_(home,itemKey,meta,true),current=readMeta_(existingFolder),sameFirst=!!(current&&Number(current.revision||1)===1&&Number(meta.revision||1)===1&&String(current.submittedAt||'')===String(meta.submittedAt||'')&&String(current.identityHash||'')===String(meta.identityHash||''));
     if(current&&!sameFirst&&!validParentEditToken_(data.editToken,itemKey,current))return requestText_(requestId,false,'parent verification expired');
-    delete meta._parentEditToken;meta._driveFileName=fileName;meta.fileMime=String(data.fileMime||'application/pdf');writeApp_(base,itemKey,meta,fileName,b64,data.fileMime||'');saveApplicationIndex_(base,itemKey,meta);
-    const nextProof=firstParentProofHash_(meta),nextToken=nextProof?parentEditToken_(itemKey,nextProof):'';
-    return requestText_(requestId,true,'synced',{itemKey:itemKey,revision:Number(meta.revision||1),fileName:fileName,editToken:nextToken});
   }finally{lock.releaseLock()}
+  delete meta._parentEditToken;meta._driveFileName=fileName;meta.fileMime=String(data.fileMime||'application/pdf');writeApp_(base,itemKey,meta,fileName,b64,data.fileMime||'');saveApplicationIndex_(base,itemKey,meta);
+  const nextProof=firstParentProofHash_(meta),nextToken=nextProof?parentEditToken_(itemKey,nextProof):'';
+  return requestText_(requestId,true,'synced',{itemKey:itemKey,revision:Number(meta.revision||1),fileName:fileName,editToken:nextToken});
 }
 
 function writeForm_(base,itemKey,meta,pdfName,pdfBase64,wordName,wordBase64){
   const home=formFolder_(base,meta.id||itemKey,meta.title||'Bieu mau',true),source=child_(home,FORM_SOURCE),old=readMeta_(source)||{};
   if(pdfBase64){assertPdfSize_(pdfBase64);replacePdf_(source,pdfName,pdfBase64)}else if(!readPdf_(source,old._drivePdfName))throw new Error('missing form pdf');
   if(wordBase64){assertFileSize_(wordBase64);replaceWord_(source,wordName,wordBase64);meta._driveWordName=wordName}else meta._driveWordName=String(meta._driveWordName||old._driveWordName||'');
-  meta.hasWordTemplate=!!meta._driveWordName;meta._drivePdfName=pdfName||old._drivePdfName||'';meta.driveHierarchyPath=SYSTEM_ROOT+'/'+home.getName()+'/'+FORM_SOURCE;upText_(source,'metadata.json',JSON.stringify(meta));
+  meta.hasWordTemplate=!!meta._driveWordName;meta._drivePdfName=pdfName||old._drivePdfName||'';meta.driveHierarchyPath=SYSTEM_ROOT+'/'+home.getName()+'/'+FORM_SOURCE;upText_(source,'metadata.json',JSON.stringify(meta));bumpDriveList_(base);
 }
 function writeApp_(base,itemKey,meta,fileName,fileBase64,fileMime){
   if(!meta.formId)throw new Error('missing form id');
   const home=formFolder_(base,meta.formId,meta.formTitle||'Ho so',true),item=appFolder_(home,itemKey,meta,true),old=readMeta_(item)||{};assertIncoming_(meta,old);
   if(fileBase64){assertFileSize_(fileBase64);replaceRecordFile_(item,fileName,fileBase64,fileMime)}else if(!readRecordFile_(item,old))throw new Error('missing app file');
-  meta._driveFileName=fileName||old._driveFileName||old._driveWordName||old._drivePdfName||'';if(/\.docx?$/i.test(meta._driveFileName)){meta._driveWordName=meta._driveFileName;delete meta._drivePdfName}else{meta._drivePdfName=meta._driveFileName;delete meta._driveWordName}meta.driveHierarchyPath=SYSTEM_ROOT+'/'+home.getName()+'/'+FORM_RECORDS+'/'+item.getName();upText_(item,'metadata.json',JSON.stringify(meta));
+  meta._driveFileName=fileName||old._driveFileName||old._driveWordName||old._drivePdfName||'';if(/\.docx?$/i.test(meta._driveFileName)){meta._driveWordName=meta._driveFileName;delete meta._drivePdfName}else{meta._drivePdfName=meta._driveFileName;delete meta._driveWordName}meta.driveHierarchyPath=SYSTEM_ROOT+'/'+home.getName()+'/'+FORM_RECORDS+'/'+item.getName();upText_(item,'metadata.json',JSON.stringify(meta));bumpDriveList_(base);
 }
 function assertIncoming_(incoming,current){
   if(!current||!current.id)return;const nextRevision=Number(incoming.revision||1),oldRevision=Number(current.revision||1),nextTime=String(incoming.lastEditedAt||incoming.updatedAt||incoming.submittedAt||''),oldTime=String(current.lastEditedAt||current.updatedAt||current.submittedAt||'');
@@ -2093,6 +2094,30 @@ function listHierarchy_(base,out){
   }
 }
 
+var LIST_CACHE_SECONDS=120;
+function listCacheKey_(base){return 'SFLIST_'+base.getId()}
+function bumpDriveList_(base){try{CacheService.getScriptCache().remove(listCacheKey_(base)+'_n')}catch(err){}}
+function driveListFast_(base,q){
+  var cache=CacheService.getScriptCache(),key=listCacheKey_(base);
+  if(String(q.fresh||'')!=='1'){
+    var count=Number(cache.get(key+'_n')||0);
+    if(count>0){
+      var names=[],i;for(i=0;i<count;i++)names.push(key+'_'+i);
+      var parts=cache.getAll(names),text='',ok=true;
+      for(i=0;i<count;i++){var piece=parts[key+'_'+i];if(piece==null){ok=false;break}text+=piece}
+      if(ok){try{return{ok:true,items:JSON.parse(text),systemFolder:SYSTEM_ROOT,cached:true}}catch(err){}}
+    }
+  }
+  var out=[];listHierarchy_(base,out);
+  try{
+    var body=JSON.stringify(out),size=95000,total=Math.ceil(body.length/size);
+    if(total>0&&total<=60){
+      var map={},j;for(j=0;j<total;j++)map[key+'_'+j]=body.substring(j*size,(j+1)*size);
+      cache.putAll(map,LIST_CACHE_SECONDS);cache.put(key+'_n',String(total),LIST_CACHE_SECONDS);
+    }
+  }catch(err){}
+  return{ok:true,items:out,systemFolder:SYSTEM_ROOT,cached:false};
+}
 function rememberRoot_(base){
   if(!base)return;const props=PropertiesService.getScriptProperties(),id=base.getId();props.setProperty('SMARTFORMS_ROOT_FOLDER_ID',id);
   const account=adminAccountRecord_();if(account)writeAdminAccountFile_(base,account);
@@ -3492,5 +3517,1146 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 
 })();
 /* ===== Kết thúc SmartForms 13.0 ===== */
+
+
+/* ===== SmartForms 14.0 · tăng tốc Google Drive · chống nghẽn khi nhiều người nhập liệu =====
+   Mục tiêu:
+   1. Không còn lỗi "Hết thời gian chờ Google." / "Không kết nối được Google." khi đăng nhập admin
+      (mọi yêu cầu đọc đều được thử lại tự động thay vì hỏng ngay lần đầu).
+   2. Tải dữ liệu Drive song song thay vì lần lượt từng hồ sơ  -> đăng nhập nhanh hơn nhiều lần.
+   3. Phần dữ liệu còn lại được tải ngầm sau khi vào được trang quản trị (không bắt admin chờ).
+   4. Admin tự cập nhật ngầm hồ sơ mới mỗi 30 giây, không giật, không nhấp nháy màn hình.
+   5. Phụ huynh nộp cùng lúc: tự thử lại khi Apps Script báo bận thay vì báo lỗi cho phụ huynh.
+   ================================================================================= */
+(function installSmartForms14(){
+'use strict';
+if(window.__sf14Installed)return;window.__sf14Installed=true;
+
+const CFG={
+ POOL:4,                       // số yêu cầu Google chạy song song tối đa
+ RETRIES:3,                    // số lần thử lại cho mỗi yêu cầu đọc
+ BACKOFF:[700,1600,3000],      // giãn cách giữa các lần thử lại (ms)
+ MIN_TIMEOUT:20000,
+ POLL_GAP:800,                 // gộp các lần hỏi trạng thái quá dày
+ LIST_TTL:8000,                // gộp các lần gọi driveList trùng nhau
+ CATALOG_TTL:4000,
+ STATUS_TTL:12000,
+ FG_ITEMS:40,                  // số tệp tối đa tải ngay lúc đăng nhập
+ FG_BYTES:22*1024*1024,        // dung lượng tối đa tải ngay lúc đăng nhập
+ AHEAD:6,                      // số tệp được tải trước sẵn trong bộ nhớ
+ AHEAD_BYTES:26*1024*1024,
+ BACKLOG_DELAY:2500,           // chờ bao lâu rồi mới tải nốt phần còn lại
+ ADMIN_POLL:30000,             // chu kỳ tự cập nhật ngầm của trang admin
+ UPLOAD_RETRIES:3              // số lần nộp lại khi Apps Script báo bận
+};
+
+const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+const isParent=()=>{try{return !!(window.isParentPortal&&window.isParentPortal())}catch{return false}};
+const BUSY=/service busy|rate limited|quá tải|bận|đang bận|Hết thời gian chờ|Không kết nối được|chưa xác nhận|timeout|network/i;
+const SOFT=/Hết thời gian chờ|Không kết nối được|network|Failed to fetch|load failed/i;
+
+/* ================================================================
+   1. BỘ ĐIỀU PHỐI YÊU CẦU GOOGLE (thay cho jsonp cũ)
+   ================================================================ */
+const baseJsonp=jsonp;
+const gate={active:0,queue:[]};
+function takeSlot(priority){
+ return new Promise(resolve=>{
+  gate.queue.push({priority:Number(priority||0),seq:gate.queue.length,resolve});
+  gate.queue.sort((a,b)=>a.priority-b.priority||a.seq-b.seq);
+  pumpGate();
+ });
+}
+function pumpGate(){
+ while(gate.active<CFG.POOL&&gate.queue.length){gate.active++;gate.queue.shift().resolve()}
+}
+function freeSlot(){gate.active=Math.max(0,gate.active-1);pumpGate()}
+
+/* Mọi action của Apps Script đều là đọc (GET) nên thử lại luôn an toàn. */
+async function request(endpoint,params,timeout,options){
+ const opts=options||{},priority=Number(opts.priority||0),tries=Math.max(1,Number(opts.retries||CFG.RETRIES));
+ const budget=Math.max(CFG.MIN_TIMEOUT,Number(timeout)||30000);
+ await takeSlot(priority);
+ try{
+  let lastError=null;
+  for(let attempt=0;attempt<tries;attempt++){
+   const query=attempt?Object.assign({},params,{_r:String(attempt)}):params;
+   try{return await baseJsonp(endpoint,query,budget)}
+   catch(error){
+    lastError=error;
+    if(attempt===tries-1)break;
+    if(!SOFT.test(String(error&&error.message||error)))break;
+    await sleep((CFG.BACKOFF[attempt]||3000)+Math.random()*400);
+   }
+  }
+  throw lastError||new Error('Google không phản hồi.');
+ }finally{freeSlot()}
+}
+
+/* Gộp các yêu cầu đọc giống hệt nhau đang chạy + nhớ tạm kết quả trong vài giây. */
+const shareBox=new Map();
+function shared(endpoint,params,timeout,ttl,priority){
+ const key=endpoint+'|'+JSON.stringify(params);
+ const hit=shareBox.get(key);
+ if(hit&&(hit.promise||Date.now()-hit.at<ttl))return hit.promise||Promise.resolve(hit.value);
+ const promise=request(endpoint,params,timeout,{priority}).then(value=>{
+  shareBox.set(key,{at:Date.now(),value});
+  setTimeout(()=>{const cur=shareBox.get(key);if(cur&&!cur.promise&&Date.now()-cur.at>=ttl)shareBox.delete(key)},ttl+250);
+  return value;
+ }).catch(error=>{shareBox.delete(key);throw error});
+ shareBox.set(key,{at:Date.now(),promise});
+ return promise;
+}
+
+/* Hỏi trạng thái quá dày làm Apps Script phải mở thêm phiên chạy -> gộp lại. */
+const pollBox=new Map();
+async function pollStatus(endpoint,params,timeout){
+ const key=endpoint+'|'+params.action+'|'+(params.requestId||params.jobId||'');
+ const hit=pollBox.get(key);
+ if(hit&&hit.pending&&Date.now()-hit.at<CFG.POLL_GAP)return hit.value;
+ const value=await request(endpoint,params,timeout,{priority:-1,retries:CFG.RETRIES});
+ pollBox.set(key,{at:Date.now(),pending:!!(value&&value.pending),value});
+ if(value&&!value.pending)setTimeout(()=>pollBox.delete(key),2000);
+ return value;
+}
+
+/* ================================================================
+   2. TẢI SONG SONG THAY CHO TẢI LẦN LƯỢT
+   Khi driveList trả về, hệ thống tải trước các tệp cần thiết theo nhóm 4 yêu cầu
+   song song. Vòng lặp cũ chỉ việc lấy kết quả đã có sẵn trong bộ nhớ.
+   ================================================================ */
+let plan=null;
+function itemKeyOf(kind,formId,itemKey){return String(kind||'')+'|'+String(formId||'')+'|'+String(itemKey||'')}
+
+async function needsDownload(kind,meta,itemKey){
+ const id=String((meta&&meta.id)||itemKey||'');
+ if(!id)return true;
+ try{
+  if(kind==='form'){
+   const local=await idbGet('forms',id);
+   if(!local||!bufferAlive(local.pdfBuffer))return true;
+   const remoteTime=String((meta&&(meta.updatedAt||meta.createdAt))||''),localTime=String(local.updatedAt||local.createdAt||'');
+   if(localTime<remoteTime)return true;
+   if((meta&&(meta.hasWordTemplate||meta._driveWordName))&&!bufferAlive(local.wordBuffer))return true;
+   return false;
+  }
+  const local=await idbGet('apps',id);
+  const isWord=applicationIsWord(meta||{});
+  if(!local||!bufferAlive(isWord?local.word:local.pdf))return true;
+  return String(applicationLatestAt(local))<String(applicationLatestAt(meta||{}));
+ }catch{return true}
+}
+
+function startPlan(endpoint,params,list){
+ const items=[];
+ const seen=new Set();
+ for(const raw of (list&&list.items)||[]){
+  const meta=raw.meta||{};
+  const key=itemKeyOf(raw.kind,raw.formId||meta.formId||'',raw.itemKey);
+  if(seen.has(key))continue;seen.add(key);
+  items.push({kind:raw.kind,formId:String(raw.formId||meta.formId||''),itemKey:String(raw.itemKey||meta.id||''),meta});
+ }
+ plan={
+  endpoint,token:String(params.token||''),folder:String(params.folder||''),
+  items,queue:[],cache:new Map(),bytes:0,cachedBytes:0,fetched:0,capped:false,
+  backlog:[],backlogTimer:null,ready:false,createdAt:Date.now()
+ };
+ const current=plan;
+ (async()=>{
+  let checked=0;
+  for(const item of items){
+   if(plan!==current)return;
+   if(await needsDownload(item.kind,item.meta,item.itemKey))current.queue.push(item);
+   if(++checked%8===0)pumpPlan(current);
+  }
+  current.ready=true;pumpPlan(current);
+ })();
+ return list;
+}
+
+function pumpPlan(target){
+ const p=target||plan;
+ if(!p||p!==plan||p.capped)return;
+ /* Đủ phần cần hiển thị ngay: phần còn lại để tải ngầm sau khi admin đã vào được trang. */
+ if(p.fetched+p.cache.size>=CFG.FG_ITEMS||p.bytes+p.cachedBytes>=CFG.FG_BYTES){
+  p.capped=true;
+  for(const rest of p.queue)queueBacklog(p,rest);
+  p.queue=[];
+  return;
+ }
+ while(p.queue.length&&p.cache.size<CFG.AHEAD&&p.cachedBytes<CFG.AHEAD_BYTES){
+  const item=p.queue.shift();
+  const key=itemKeyOf(item.kind,item.formId,item.itemKey);
+  if(p.cache.has(key))continue;
+  const promise=request(p.endpoint,{action:'driveItem',token:p.token,folder:p.folder,kind:item.kind,formId:item.formId,itemKey:item.itemKey},90000,{priority:1})
+   .then(result=>{const size=sizeOf(result);p.cachedBytes+=size;return result})
+   .catch(()=>({ok:false,error:'prefetch failed'}));
+  p.cache.set(key,{promise,item});
+ }
+}
+function sizeOf(result){
+ if(!result)return 0;
+ const main=String(result.fileBase64||result.pdfBase64||result.wordBase64||'').length;
+ const extra=result.fileBase64&&result.wordBase64&&result.fileBase64!==result.wordBase64?String(result.wordBase64).length:0;
+ return main+extra;
+}
+
+async function driveItem(endpoint,params,timeout){
+ const p=plan;
+ const key=itemKeyOf(params.kind,params.formId||'',params.itemKey);
+ if(p&&p.endpoint===endpoint){
+  const hit=p.cache.get(key);
+  /* Vượt ngân sách của phiên đăng nhập: phần còn lại chuyển sang tải ngầm. */
+  if(!hit&&(p.fetched>=CFG.FG_ITEMS||p.bytes>=CFG.FG_BYTES)){
+   if(!p.capped){
+    p.capped=true;
+    for(const rest of p.queue)queueBacklog(p,rest);
+    p.queue=[];
+   }
+   const meta=(p.items.find(x=>itemKeyOf(x.kind,x.formId,x.itemKey)===key)||{}).meta||{};
+   queueBacklog(p,{kind:params.kind,formId:String(params.formId||''),itemKey:String(params.itemKey||''),meta});
+   return {ok:false,error:'deferred'};
+  }
+  if(hit){
+   p.cache.delete(key);
+   const result=await hit.promise;
+   const size=sizeOf(result);
+   p.cachedBytes=Math.max(0,p.cachedBytes-size);
+   p.fetched++;p.bytes+=size;
+   pumpPlan(p);
+   if(result&&result.ok)return result;
+  }else if(p.queue.length){
+   /* Tránh tải trùng: bỏ mục này khỏi hàng đợi tải trước. */
+   p.queue=p.queue.filter(x=>itemKeyOf(x.kind,x.formId,x.itemKey)!==key);
+  }
+  const direct=await request(endpoint,params,timeout,{priority:0});
+  const size=sizeOf(direct);
+  p.fetched++;p.bytes+=size;
+  pumpPlan(p);
+  return direct;
+ }
+ return request(endpoint,params,timeout,{priority:0});
+}
+
+function queueBacklog(p,item){
+ const key=itemKeyOf(item.kind,item.formId,item.itemKey);
+ if(p.backlog.some(x=>itemKeyOf(x.kind,x.formId,x.itemKey)===key))return;
+ p.backlog.push(item);
+ clearTimeout(p.backlogTimer);
+ p.backlogTimer=setTimeout(()=>runBacklog(p),CFG.BACKLOG_DELAY);
+}
+
+let backlogRunning=false;
+async function runBacklog(p){
+ if(backlogRunning||!p||!p.backlog.length)return;
+ backlogRunning=true;
+ let imported=0;
+ try{
+  while(p.backlog.length){
+   const batch=p.backlog.splice(0,3);
+   const results=await Promise.all(batch.map(item=>
+    request(p.endpoint,{action:'driveItem',token:p.token,folder:p.folder,kind:item.kind,formId:item.formId,itemKey:item.itemKey},90000,{priority:6})
+     .then(result=>({item,result})).catch(()=>null)
+   ));
+   for(const entry of results){
+    if(!entry||!entry.result||!entry.result.ok)continue;
+    if(await importItem(entry.item,entry.result,p.folder))imported++;
+   }
+   await sleep(250);
+  }
+ }finally{
+  backlogRunning=false;
+  if(imported)quietRefresh();
+ }
+}
+
+/* Ghi dữ liệu tải ngầm vào kho nội bộ đúng như luồng đồng bộ gốc. */
+async function importItem(item,result,folder){
+ try{
+  const meta=result.meta||item.meta||{};
+  const b64=String(result.fileBase64||result.pdfBase64||result.wordBase64||'');
+  if(!b64)return false;
+  const fileName=String(result.fileName||'');
+  const looksWord=/\.docx?$/i.test(fileName);
+  if(item.kind==='form'){
+   const id=String(meta.id||item.itemKey),local=(await idbGet('forms',id))||{};
+   const record=Object.assign({},local,meta,{id,driveFolderUrl:folder||local.driveFolderUrl||''});
+   if(looksWord){
+    record.wordBuffer=base64ToArrayBuffer(b64);
+    record.wordOriginalName=fileName;
+    record.wordMime=result.fileMime||wordMimeFromName(fileName);
+    record.hasWordTemplate=true;
+    if(!bufferAlive(record.pdfBuffer)&&bufferAlive(local.pdfBuffer))record.pdfBuffer=local.pdfBuffer;
+   }else{
+    record.pdfBuffer=base64ToArrayBuffer(b64);
+    if(result.wordBase64){
+     record.wordBuffer=base64ToArrayBuffer(result.wordBase64);
+     record.wordOriginalName=result.wordName||record.wordOriginalName||'';
+     record.wordMime=result.wordMime||wordMimeFromName(result.wordName||'');
+     record.hasWordTemplate=true;
+    }else if(bufferAlive(local.wordBuffer))record.wordBuffer=local.wordBuffer;
+   }
+   await idbPut('forms',record);
+   return true;
+  }
+  const id=String(meta.id||item.itemKey),local=(await idbGet('apps',id))||{};
+  const isWord=looksWord||applicationIsWord(meta);
+  const record=Object.assign({},local,meta,{id,driveSyncStatus:'Đã chuyển lên Drive'});
+  if(isWord){
+   record.submissionMode='word';
+   record.word=base64ToArrayBuffer(b64);
+   record.wordName=fileName||meta._driveFileName||record.wordName||'';
+   record.wordMime=result.fileMime||wordMimeFromName(fileName);
+  }else record.pdf=base64ToArrayBuffer(b64);
+  await idbPut('apps',record);
+  return true;
+ }catch{return false}
+}
+
+/* ================================================================
+   3. jsonp mới: gộp - thử lại - song song
+   ================================================================ */
+jsonp=function(endpoint,params,timeout){
+ const query=params||{};
+ const action=String(query.action||'');
+ const budget=Number(timeout)||30000;
+ if(action==='requestStatus'||action==='publicRequestStatus'||action==='mailStatus')return pollStatus(endpoint,query,budget);
+ if(action==='driveItem')return driveItem(endpoint,query,budget);
+ if(action==='driveList')return shared(endpoint,query,Math.max(budget,80000),CFG.LIST_TTL,0).then(list=>{
+  if(list&&list.ok&&(!plan||plan.endpoint!==endpoint||Date.now()-plan.createdAt>20000))startPlan(endpoint,query,list);
+  return list;
+ });
+ if(action==='publicCatalog')return shared(endpoint,query,budget,CFG.CATALOG_TTL,0);
+ if(action==='adminStatus'||action==='driveHealth'||action==='bridgeHealth'||action==='publicHealth')return shared(endpoint,query,budget,CFG.STATUS_TTL,0);
+ return request(endpoint,query,budget,{priority:0});
+};
+window.jsonp=jsonp;
+
+/* ================================================================
+   4. TỰ CẬP NHẬT NGẦM CHO TRANG QUẢN TRỊ
+   ================================================================ */
+async function adminConfig(){
+ try{
+  const d=(await idbGet('settings','drive'))||{};
+  const endpoint=String(d.appsScriptUrl||'').trim().replace(/\/+$/,'');
+  const token=String(d.appsScriptToken||'').trim();
+  const folder=String(d.folderUrl||'')||Object.values(d.formFolders||{}).filter(Boolean)[0]||'';
+  if(!/^https:\/\/script\.google\.com\/macros\/s\/[-\w]+\/exec$/i.test(endpoint)||!token||!folder)return null;
+  return{endpoint,token,folder};
+ }catch{return null}
+}
+function adminIdle(){
+ try{
+  if(!state.admin||isParent())return false;
+  if(document.hidden||navigator.onLine===false)return false;
+  const modal=document.querySelector('#modal'),workspace=document.querySelector('#workspace');
+  if(modal&&!modal.classList.contains('hidden'))return false;
+  if(workspace&&!workspace.classList.contains('hidden'))return false;
+  if(typeof processingStatus!=='undefined'&&processingStatus.isBusy&&processingStatus.isBusy())return false;
+  const el=document.activeElement;
+  if(el&&el.matches&&el.matches('input,textarea,select,[contenteditable="true"]'))return false;
+  return true;
+ }catch{return false}
+}
+let refreshTimer=null;
+function quietRefresh(){
+ clearTimeout(refreshTimer);
+ refreshTimer=setTimeout(async()=>{
+  if(!adminIdle())return;
+  const search=document.querySelector('#recSearch'),status=document.querySelector('#recStatus');
+  const keepSearch=search?search.value:'',keepStatus=status?status.value:'';
+  const scrollY=window.scrollY;
+  try{if(typeof renderRecords==='function')await renderRecords()}catch{}
+  try{if(typeof renderDashboard==='function')await renderDashboard()}catch{}
+  const nextSearch=document.querySelector('#recSearch'),nextStatus=document.querySelector('#recStatus');
+  if(nextSearch&&keepSearch){nextSearch.value=keepSearch;nextSearch.dispatchEvent(new Event('input'))}
+  if(nextStatus&&keepStatus){nextStatus.value=keepStatus;nextStatus.dispatchEvent(new Event('change'))}
+  try{window.scrollTo({top:scrollY})}catch{}
+ },400);
+}
+
+let syncing=false,lastSyncAt=0;
+async function backgroundSync(force){
+ if(syncing)return;
+ if(!force&&!adminIdle())return;
+ if(!force&&Date.now()-lastSyncAt<CFG.ADMIN_POLL-2000)return;
+ const cfg=await adminConfig();
+ if(!cfg)return;
+ syncing=true;
+ try{
+  const list=await request(cfg.endpoint,{action:'driveList',token:cfg.token,folder:cfg.folder},80000,{priority:5,retries:2});
+  if(!list||!list.ok)return;
+  lastSyncAt=Date.now();
+  const pending=[],seen=new Set();
+  for(const raw of list.items||[]){
+   const meta=raw.meta||{};
+   const key=itemKeyOf(raw.kind,raw.formId||meta.formId||'',raw.itemKey);
+   if(seen.has(key))continue;seen.add(key);
+   if(await needsDownload(raw.kind,meta,raw.itemKey))pending.push({kind:raw.kind,formId:String(raw.formId||meta.formId||''),itemKey:String(raw.itemKey||meta.id||''),meta});
+  }
+  let imported=0;
+  while(pending.length){
+   const batch=pending.splice(0,3);
+   const results=await Promise.all(batch.map(item=>
+    request(cfg.endpoint,{action:'driveItem',token:cfg.token,folder:cfg.folder,kind:item.kind,formId:item.formId,itemKey:item.itemKey},90000,{priority:6,retries:2})
+     .then(result=>({item,result})).catch(()=>null)
+   ));
+   for(const entry of results){
+    if(!entry||!entry.result||!entry.result.ok)continue;
+    if(await importItem(entry.item,entry.result,cfg.folder))imported++;
+   }
+   if(!force&&!adminIdle())break;
+   await sleep(200);
+  }
+  if(imported)quietRefresh();
+ }catch{}
+ finally{syncing=false}
+}
+
+setInterval(()=>{backgroundSync(false).catch(()=>{})},CFG.ADMIN_POLL);
+window.addEventListener('focus',()=>{if(state.admin&&!isParent())setTimeout(()=>backgroundSync(false).catch(()=>{}),600)});
+window.addEventListener('online',()=>{setTimeout(()=>backgroundSync(false).catch(()=>{}),900)});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&state.admin&&!isParent())setTimeout(()=>backgroundSync(false).catch(()=>{}),800)});
+window.sf14SyncNow=()=>backgroundSync(true);
+
+/* ================================================================
+   5. PHỤ HUYNH NỘP CÙNG LÚC: tự thử lại khi Apps Script báo bận
+   ================================================================ */
+if(typeof publicUploadApplication==='function'){
+ const uploadBefore14=publicUploadApplication;
+ publicUploadApplication=async function(app){
+  let lastError=null;
+  for(let attempt=0;attempt<CFG.UPLOAD_RETRIES;attempt++){
+   try{return await uploadBefore14.call(this,app)}
+   catch(error){
+    lastError=error;
+    const message=String(error&&error.message||error);
+    if(/hết hạn|expired|không hợp lệ|invalid|quá 10 MB|too large|form unavailable/i.test(message))throw error;
+    if(!BUSY.test(message)||attempt===CFG.UPLOAD_RETRIES-1)break;
+    /* Có thể Drive đã nhận rồi mà phản hồi bị mất: kiểm tra trước khi nộp lại. */
+    try{
+     const endpoint=await driveBridgeEndpoint();
+     const name=applicationIsWord(app)?applicationWordName(app):applicationPdfName(app);
+     const found=await request(endpoint,{action:'publicHas',formId:app.formId,itemKey:app.id,fileName:name,pdfName:name},30000,{priority:0,retries:2});
+     if(found&&found.ok&&found.exists)return true;
+    }catch{}
+    await sleep(1200*(attempt+1)+Math.random()*900);
+   }
+  }
+  throw lastError||new Error('Chưa gửi được hồ sơ lên Google Drive. Hãy thử lại sau ít phút.');
+ };
+ window.publicUploadApplication=publicUploadApplication;
+}
+
+})();
+/* ===== Kết thúc SmartForms 14.0 ===== */
+
+
+/* ===== SmartForms 15.0 · Phiếu thông tin tra cứu cho phụ huynh =====
+   1. Sau khi nộp (hoặc cập nhật) hồ sơ: nút "In hồ sơ" trên trang phụ huynh được đổi thành
+      nút "Sao chép thông tin tra cứu", kèm ô chứa toàn bộ thông tin xác nhận và lời nhắc
+      lưu lại đoạn thông tin đó.
+   2. Trong mục Tra cứu: thêm ô "Dán phiếu thông tin" - hệ thống tự chuẩn hóa (ngày sinh,
+      số điện thoại, CCCD, mã hồ sơ) rồi điền vào các trường còn trống.
+   ================================================================= */
+(function installSmartForms15(){
+'use strict';
+if(window.__sf15Installed)return;window.__sf15Installed=true;
+
+const TAG='#SFDATA:';
+const q=sel=>document.querySelector(sel);
+const isParent=()=>{try{return !!(window.isParentPortal&&window.isParentPortal())}catch{return false}};
+
+/* ---------- CSS ---------- */
+(function css(){
+ if(document.getElementById('sf15Style'))return;
+ const style=document.createElement('style');style.id='sf15Style';
+ style.textContent=
+ '.sf15-box{margin-top:16px;padding:15px;border:1px solid #f0c27a;border-radius:14px;background:#fffaf0;text-align:left}'+
+ '.sf15-box h4{margin:0 0 8px;font-size:.98rem;color:#8a5a12}'+
+ '.sf15-box p{margin:0 0 10px;font-size:12.5px;line-height:1.7;color:#6a5330}'+
+ '.sf15-box textarea{width:100%;min-height:150px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;line-height:1.6;background:#fff;border:1px solid #e6d3b0;border-radius:10px;padding:10px;resize:vertical}'+
+ '.sf15-acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}'+
+ '.sf15-paste{border:1px solid var(--line);border-radius:14px;background:#f6fbff;padding:0 15px;margin:0 0 16px}'+
+ '.sf15-paste>summary{cursor:pointer;list-style:none;padding:13px 0;font-weight:800;color:#15527a;font-size:.92rem;display:flex;align-items:center;gap:8px}'+
+ '.sf15-paste>summary::-webkit-details-marker{display:none}'+
+ '.sf15-paste>summary::before{content:"\\25B8";color:var(--pri)}'+
+ '.sf15-paste[open]>summary::before{content:"\\25BE"}'+
+ '.sf15-paste .sf15-inner{padding:0 0 15px}'+
+ '.sf15-paste textarea{width:100%;min-height:120px;font-size:12.5px;line-height:1.6;border:1px solid var(--line);border-radius:10px;padding:10px;resize:vertical}'+
+ '.sf15-msg{margin-top:10px;font-size:12.5px;line-height:1.7}';
+ document.head.appendChild(style);
+})();
+
+/* ================================================================
+   1. TẠO PHIẾU THÔNG TIN
+   ================================================================ */
+function b64FromText(text){
+ const bytes=new TextEncoder().encode(String(text));
+ let out='';
+ for(let i=0;i<bytes.length;i+=0x8000)out+=String.fromCharCode.apply(null,bytes.subarray(i,i+0x8000));
+ return btoa(out);
+}
+function textFromB64(value){
+ try{
+  const raw=atob(String(value).replace(/\s+/g,''));
+  const bytes=new Uint8Array(raw.length);
+  for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);
+  return new TextDecoder().decode(bytes);
+ }catch{return ''}
+}
+function pad2(value){return String(value).padStart(2,'0')}
+function normDate(value){
+ const text=cleanSpace(value);
+ let m=text.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})$/);
+ if(m)return m[1]+'-'+pad2(m[2])+'-'+pad2(m[3]);
+ m=text.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/);
+ if(m)return m[3]+'-'+pad2(m[2])+'-'+pad2(m[1]);
+ return '';
+}
+function normCode(value){return cleanSpace(value).toUpperCase().replace(/\s+/g,'')}
+
+const DIGIT_KEYS=new Set(['studentId','studentPhone','parentId','parentPhone']);
+
+function buildReceipt(record){
+ const identity=record.identity||{};
+ const lines=[];
+ lines.push('PHIẾU THÔNG TIN TRA CỨU HỒ SƠ');
+ lines.push('(Giữ lại đoạn này để tra cứu và chỉnh sửa hồ sơ về sau)');
+ lines.push('');
+ lines.push('Mã hồ sơ: '+String(record.code||''));
+ lines.push('Biểu mẫu: '+String(record.formTitle||''));
+ lines.push('Thời điểm nộp: '+fmtTime(record.submittedAt||record.updatedAt||nowISO()));
+ lines.push('Bản cập nhật: '+String(record.revision||1));
+ lines.push('');
+ for(const [key,label] of identitySchema.map(x=>[x[0],x[1]])){
+  let value=identity[key]||'';
+  if(key==='dob'&&value)value=formatDate(value);
+  lines.push(label+': '+String(value));
+ }
+ lines.push('');
+ lines.push('Cách dùng: mở mục "Tra cứu hồ sơ" trên website của nhà trường, dán toàn bộ đoạn');
+ lines.push('thông tin này vào ô "Dán phiếu thông tin" để hệ thống tự điền, rồi bấm xác minh.');
+ lines.push('');
+ lines.push(TAG+b64FromText(JSON.stringify({
+  v:1,code:String(record.code||''),formId:String(record.formId||''),formTitle:String(record.formTitle||''),
+  submittedAt:String(record.submittedAt||''),revision:Number(record.revision||1),
+  identity:Object.fromEntries(identitySchema.map(x=>[x[0],String(identity[x[0]]||'')]))
+ })));
+ return lines.join('\n');
+}
+
+/* ================================================================
+   2. ĐỌC PHIẾU THÔNG TIN ĐÃ DÁN
+   ================================================================ */
+function labelKey(value){return foldVN(value).replace(/[^a-z0-9]+/g,' ').trim()}
+const LABELS=(()=>{
+ const map=new Map();
+ map.set(labelKey('Mã hồ sơ'),'code');
+ map.set('ma ho so','code');map.set('ma hs','code');map.set('code','code');
+ for(const [key,label] of identitySchema.map(x=>[x[0],x[1]]))map.set(labelKey(label),key);
+ const extra={
+  'ho ten hoc sinh':'studentName','ten hoc sinh':'studentName','hoc sinh':'studentName',
+  'ngay sinh':'dob','ngay thang nam sinh':'dob','sinh ngay':'dob',
+  'noi sinh':'birthPlace','que quan':'birthPlace',
+  'lop':'className','lop hoc':'className',
+  'cccd hoc sinh':'studentId','so cccd hoc sinh':'studentId','cmnd hoc sinh':'studentId',
+  'sdt hoc sinh':'studentPhone','dien thoai hoc sinh':'studentPhone','so dien thoai hoc sinh':'studentPhone',
+  'ho ten cha me':'parentName','ten cha me':'parentName','ho va ten phu huynh':'parentName','phu huynh':'parentName',
+  'cccd cha me':'parentId','so cccd cha me':'parentId','cccd phu huynh':'parentId','cmnd cha me':'parentId',
+  'sdt cha me':'parentPhone','dien thoai cha me':'parentPhone','so dien thoai phu huynh':'parentPhone','sdt phu huynh':'parentPhone'
+ };
+ for(const key of Object.keys(extra))map.set(key,extra[key]);
+ return map;
+})();
+
+function parseReceipt(text){
+ const source=String(text||'');
+ const found={};
+ const packed=source.match(/#SFDATA:\s*([A-Za-z0-9+/=]+)/);
+ if(packed){
+  try{
+   const data=JSON.parse(textFromB64(packed[1]));
+   if(data&&typeof data==='object'){
+    if(data.code)found.code=String(data.code);
+    const identity=data.identity||{};
+    for(const key of identitySchema.map(x=>x[0]))if(identity[key])found[key]=String(identity[key]);
+   }
+  }catch{}
+ }
+ for(const raw of source.split(/\r?\n/)){
+  const line=raw.trim();
+  if(!line||line.indexOf(TAG)===0)continue;
+  const at=line.indexOf(':');
+  if(at<1)continue;
+  const key=LABELS.get(labelKey(line.slice(0,at)));
+  if(!key)continue;
+  const value=line.slice(at+1).trim();
+  if(!value||found[key])continue;
+  found[key]=value;
+ }
+ if(!found.code){
+  const code=source.match(/\bST-\d{4}-[A-Z0-9]{4,}\b/i);
+  if(code)found.code=code[0];
+ }
+ /* chuẩn hóa */
+ const clean={};
+ for(const key of Object.keys(found)){
+  let value=String(found[key]);
+  if(key==='code')value=normCode(value);
+  else if(key==='dob')value=normDate(value)||'';
+  else if(DIGIT_KEYS.has(key))value=normDigits(value);
+  else value=cleanSpace(value);
+  if(value)clean[key]=value;
+ }
+ return clean;
+}
+
+/* ================================================================
+   3. PHIẾU THÔNG TIN SAU KHI NỘP HỒ SƠ
+   ================================================================ */
+async function findSubmittedRecord(container){
+ let code='';
+ try{const m=(container.textContent||'').match(/\bST-\d{4}-[A-Z0-9]{4,}\b/i);if(m)code=normCode(m[0])}catch{}
+ const apps=await idbAll('apps');
+ if(code){
+  const hit=apps.find(app=>normCode(app.code)===code);
+  if(hit)return hit;
+ }
+ return apps.sort((a,b)=>String(applicationLatestAt(b)).localeCompare(String(applicationLatestAt(a))))[0]||null;
+}
+
+async function attachReceipt(selector){
+ try{
+  const container=q(selector);
+  if(!container||container.querySelector('#sf15Receipt'))return;
+  if(!isParent()&&state.admin)return;
+  if(!/Hoàn tất hồ sơ|Đã cập nhật hồ sơ|Mã hồ sơ/i.test(container.textContent||''))return;
+  const record=await findSubmittedRecord(container);
+  if(!record||!record.code)return;
+  const text=buildReceipt(record);
+
+  const box=document.createElement('div');
+  box.className='sf15-box';box.id='sf15Receipt';
+  box.innerHTML=
+   '<h4>⚠ Lưu ý quan trọng: hãy lưu lại thông tin tra cứu</h4>'+
+   '<p>Bấm <b>Sao chép thông tin tra cứu</b> rồi dán và lưu vào nơi phụ huynh dễ tìm lại '+
+   '(tin nhắn Zalo tự gửi cho mình, ghi chú điện thoại, email…). Khi cần <b>xem lại hoặc sửa hồ sơ</b>, '+
+   'chỉ cần dán đoạn này vào mục <b>Tra cứu hồ sơ</b>, hệ thống sẽ tự điền giúp phụ huynh.</p>'+
+   '<textarea id="sf15ReceiptText" readonly spellcheck="false"></textarea>'+
+   '<div class="sf15-acts">'+
+   '<button class="btn primary" type="button" id="sf15Copy">Sao chép thông tin tra cứu</button>'+
+   '<button class="btn secondary" type="button" id="sf15Save">Lưu thành tệp .txt</button>'+
+   '</div>'+
+   '<div class="sf15-msg" id="sf15Msg"></div>';
+  const area=box.querySelector('#sf15ReceiptText');
+  area.value=text;
+
+  const actions=container.querySelector('.actions');
+  if(actions)actions.insertAdjacentElement('afterend',box);else container.appendChild(box);
+
+  /* Đổi nút In thành nút lưu ý trên trang phụ huynh */
+  const printButton=container.querySelector('#printNow');
+  if(printButton&&isParent()){
+   printButton.textContent='⚠ Lưu thông tin tra cứu';
+   printButton.className='btn secondary';
+   printButton.onclick=()=>{box.scrollIntoView({behavior:'smooth',block:'center'});copyReceipt(box)};
+  }
+
+  box.querySelector('#sf15Copy').onclick=()=>copyReceipt(box);
+  box.querySelector('#sf15Save').onclick=()=>{
+   try{
+    downloadBlob(new Blob([text],{type:'text/plain;charset=utf-8'}),'Thong-tin-tra-cuu-'+normCode(record.code)+'.txt');
+    box.querySelector('#sf15Msg').innerHTML='<span style="color:var(--ok,#1d7a4c)">Đã tải tệp ghi chú về máy.</span>';
+   }catch(error){box.querySelector('#sf15Msg').textContent='Không tải được tệp: '+(error&&error.message||error)}
+  };
+ }catch{}
+}
+
+async function copyReceipt(box){
+ const area=box.querySelector('#sf15ReceiptText'),msg=box.querySelector('#sf15Msg');
+ let ok=false;
+ try{await navigator.clipboard.writeText(area.value);ok=true}
+ catch{
+  try{area.removeAttribute('readonly');area.focus();area.select();ok=document.execCommand('copy');area.setAttribute('readonly','readonly')}catch{}
+ }
+ msg.innerHTML=ok
+  ?'<b style="color:#1d7a4c">✓ Đã sao chép.</b> Hãy dán và lưu ngay vào ghi chú hoặc tin nhắn của phụ huynh.'
+  :'<b style="color:#b3541e">Trình duyệt chặn sao chép tự động.</b> Hãy bấm giữ vào ô trên, chọn toàn bộ rồi sao chép thủ công.';
+}
+
+/* Gắn vào luồng nộp hồ sơ PDF và Word */
+if(typeof submitApplication==='function'){
+ const before=submitApplication;
+ submitApplication=async function(...args){
+  const result=await before.apply(this,args);
+  setTimeout(()=>attachReceipt('#workForm'),60);
+  return result;
+ };
+ window.submitApplication=submitApplication;
+}
+if(typeof submitWordApplication==='function'){
+ const beforeWord=submitWordApplication;
+ submitWordApplication=async function(...args){
+  const result=await beforeWord.apply(this,args);
+  setTimeout(()=>attachReceipt('#modalBody'),60);
+  return result;
+ };
+ window.submitWordApplication=submitWordApplication;
+}
+
+/* ================================================================
+   4. Ô DÁN PHIẾU THÔNG TIN TRONG MỤC TRA CỨU
+   ================================================================ */
+function fillLookupForm(data,overwrite){
+ const form=q('#lookupForm');
+ if(!form)return{filled:0,conflicts:0,mode:''};
+ const mode=q('#lookupMode');
+ let filled=0,conflicts=0;
+ const setValue=(input,value)=>{
+  if(!input||!value)return;
+  const current=String(input.value||'').trim();
+  if(current&&!overwrite){if(cleanSpace(current)!==cleanSpace(value))conflicts++;return}
+  input.value=value;filled++;
+  input.dispatchEvent(new Event('input',{bubbles:true}));
+  input.dispatchEvent(new Event('change',{bubbles:true}));
+ };
+ for(const key of identitySchema.map(x=>x[0]))setValue(form.elements[key],data[key]);
+ if(form.elements.applicationCode)setValue(form.elements.applicationCode,data.code);
+ if(form.elements.parentProof)setValue(form.elements.parentProof,data.parentPhone||data.parentId||'');
+
+ let chosen='';
+ const hasIdentity=identitySchema.map(x=>x[0]).every(key=>String((form.elements[key]&&form.elements[key].value)||'').trim());
+ const hasCode=!!data.code&&!!(data.parentPhone||data.parentId);
+ if(mode){
+  chosen=hasIdentity?'identity':(hasCode?'code':mode.value);
+  if(mode.value!==chosen){mode.value=chosen;mode.dispatchEvent(new Event('change',{bubbles:true}))}
+ }
+ return{filled,conflicts,mode:chosen};
+}
+
+function injectPastePanel(){
+ const form=q('#lookupForm');
+ if(!form||q('#sf15Paste'))return;
+ const panel=document.createElement('details');
+ panel.className='sf15-paste';panel.id='sf15Paste';panel.open=true;
+ panel.innerHTML=
+  '<summary>Đã lưu phiếu thông tin? Dán vào đây để hệ thống tự điền</summary>'+
+  '<div class="sf15-inner">'+
+  '<textarea id="sf15PasteText" placeholder="Dán toàn bộ đoạn thông tin tra cứu đã lưu khi nộp hồ sơ…" spellcheck="false"></textarea>'+
+  '<div class="sf15-acts">'+
+  '<button class="btn primary" type="button" id="sf15Fill">Tự điền vào biểu mẫu</button>'+
+  '<button class="btn secondary" type="button" id="sf15FromClipboard">Dán từ bộ nhớ tạm</button>'+
+  '<button class="btn ghost" type="button" id="sf15Clear">Xóa ô dán</button>'+
+  '</div>'+
+  '<div class="sf15-msg" id="sf15PasteMsg">Hệ thống tự chuẩn hóa ngày sinh, số điện thoại, CCCD và mã hồ sơ rồi điền vào các ô còn trống.</div>'+
+  '</div>';
+ form.insertAdjacentElement('beforebegin',panel);
+
+ const area=panel.querySelector('#sf15PasteText');
+ const msg=panel.querySelector('#sf15PasteMsg');
+ let lastData=null;
+
+ const run=overwrite=>{
+  const data=parseReceipt(area.value);
+  if(!Object.keys(data).length){
+   msg.innerHTML='<span style="color:#b3541e">Chưa đọc được thông tin trong đoạn vừa dán. Hãy dán lại đầy đủ phiếu thông tin tra cứu đã lưu khi nộp hồ sơ.</span>';
+   return;
+  }
+  lastData=data;
+  const result=fillLookupForm(data,!!overwrite);
+  let html=result.filled
+   ?'<b style="color:#1d7a4c">✓ Đã điền '+result.filled+' ô</b>'
+   :'<b style="color:#1d7a4c">✓ Các ô đã khớp với phiếu thông tin</b>';
+  if(data.code)html+=' · Mã hồ sơ: <b>'+esc(data.code)+'</b>';
+  if(result.mode==='code')html+=' · Đang dùng cách tra cứu <b>bằng mã hồ sơ</b>.';
+  else if(result.mode==='identity')html+=' · Đang dùng cách tra cứu <b>bằng thông tin xác nhận</b>.';
+  html+='<br>Hãy kiểm tra lại rồi bấm nút xác minh bên dưới.';
+  if(result.conflicts)html+='<br><button class="btn ghost" type="button" id="sf15Overwrite" style="margin-top:8px">Ghi đè '+result.conflicts+' ô đang có nội dung khác</button>';
+  msg.innerHTML=html;
+  const overwriteButton=msg.querySelector('#sf15Overwrite');
+  if(overwriteButton)overwriteButton.onclick=()=>run(true);
+ };
+
+ panel.querySelector('#sf15Fill').onclick=()=>run(false);
+ panel.querySelector('#sf15Clear').onclick=()=>{area.value='';msg.textContent='Đã xóa ô dán.'};
+ panel.querySelector('#sf15FromClipboard').onclick=async()=>{
+  try{
+   const text=await navigator.clipboard.readText();
+   if(!text){msg.innerHTML='<span style="color:#b3541e">Bộ nhớ tạm đang trống.</span>';return}
+   area.value=text;run(false);
+  }catch{
+   msg.innerHTML='<span style="color:#b3541e">Trình duyệt không cho đọc bộ nhớ tạm. Hãy bấm giữ vào ô trên và chọn “Dán”.</span>';
+  }
+ };
+ area.addEventListener('paste',()=>setTimeout(()=>run(false),40));
+}
+
+/* ================================================================
+   5. Gắn lại sau mỗi lần giao diện được dựng lại
+   ================================================================ */
+let tidyTimer=null;
+function schedule(){
+ clearTimeout(tidyTimer);
+ tidyTimer=setTimeout(()=>{try{injectPastePanel()}catch{}},80);
+}
+function boot(){
+ schedule();
+ const root=document.querySelector('main.wrap')||document.body;
+ new MutationObserver(schedule).observe(root,{childList:true,subtree:true});
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
+
+window.sf15BuildReceipt=buildReceipt;
+window.sf15ParseReceipt=parseReceipt;
+
+})();
+/* ===== Kết thúc SmartForms 15.0 ===== */
+
+
+/* ===== SmartForms 16.0 · Gọn lại màn hình đăng nhập quản trị =====
+   Chia thành đúng hai trường hợp:
+   · Đã có tài khoản  -> dán URL Apps Script của nhà trường + tên đăng nhập, mật khẩu.
+   · Chưa có tài khoản -> dùng (hoặc tạo) tài khoản admin mặc định ban đầu của website.
+   Toàn bộ xử lý đăng nhập cũ được giữ nguyên, chỉ sắp xếp lại giao diện.
+   ================================================================= */
+(function installSmartForms16(){
+'use strict';
+if(window.__sf16Installed)return;window.__sf16Installed=true;
+
+(function css(){
+ if(document.getElementById('sf16Style'))return;
+ const style=document.createElement('style');style.id='sf16Style';
+ style.textContent=
+ '#sf16Login h2{margin:0 0 4px}'+
+ '#sf16Login .auth-subtitle{margin:0 0 14px}'+
+ '.sf16-tabs{display:flex;gap:6px;background:#eef3f9;padding:5px;border-radius:13px;margin-bottom:15px}'+
+ '.sf16-tab{flex:1;border:0;background:transparent;padding:11px 8px;border-radius:9px;font:inherit;font-weight:800;font-size:.86rem;color:#5a6b82;cursor:pointer;line-height:1.3}'+
+ '.sf16-tab.active{background:#fff;color:#0f4c75;box-shadow:0 1px 5px #15437a22}'+
+ '.sf16-hint{font-size:12.5px;line-height:1.7;color:#61718a;margin:0 0 13px}'+
+ '.sf16-pane>form{display:grid;gap:13px}'+
+ '.sf16-sep{margin:16px 0 0;padding-top:13px;border-top:1px solid var(--line);font-size:12px;line-height:1.7;color:#7a879b}';
+ document.head.appendChild(style);
+})();
+
+function readLocalAdmin(){try{return JSON.parse(localStorage.getItem('st_pdf_admin')||'{}')}catch{return{}}}
+
+function tidyAdminGate(){
+ const gate=document.querySelector('#adminGate');
+ if(!gate||gate.classList.contains('hidden'))return;
+ const form=gate.querySelector('#hybridAdminLogin');
+ if(!form||gate.querySelector('#sf16Login'))return;
+
+ const endpointInput=form.querySelector('[name="endpoint"]');
+ const usernameInput=form.querySelector('[name="username"]');
+ const passwordInput=form.querySelector('[name="password"]');
+ if(!endpointInput||!usernameInput||!passwordInput)return;
+
+ const account=readLocalAdmin();
+ const hasDefault=!!(account.username&&account.salt&&account.hash);
+
+ const endpointField=endpointInput.closest('.field')||endpointInput;
+ const usernameField=usernameInput.closest('.field')||usernameInput;
+ const passwordField=passwordInput.closest('.field')||passwordInput;
+ const urlCheck=gate.querySelector('#adminUrlCheck');
+ const submitButton=form.querySelector('button[type="submit"]');
+ const progress=gate.querySelector('#hybridAdminProgress');
+ const setupForm=gate.querySelector('#defaultAdminSetup');
+ const setupProgress=gate.querySelector('#defaultAdminProgress');
+
+ const card=document.createElement('div');
+ card.className='card panel connection-card';
+ card.id='sf16Login';
+ card.innerHTML=
+  '<h2>Đăng nhập quản trị</h2>'+
+  '<p class="auth-subtitle">Chọn đúng trường hợp của nhà trường để đăng nhập.</p>'+
+  '<div class="sf16-tabs">'+
+  '<button type="button" class="sf16-tab active" data-sf16="have">Đã có tài khoản</button>'+
+  '<button type="button" class="sf16-tab" data-sf16="new">Chưa có tài khoản</button>'+
+  '</div>'+
+  '<div class="sf16-pane" data-pane="have">'+
+  '<p class="sf16-hint">Dán liên kết hệ thống của nhà trường (URL Apps Script kết thúc bằng <b>/exec</b> hoặc liên kết quản trị đã được cấp), rồi nhập tài khoản thuộc liên kết đó.</p>'+
+  '<div id="sf16HaveBody"></div></div>'+
+  '<div class="sf16-pane hidden" data-pane="new"><div id="sf16NewBody"></div></div>'+
+  '<div id="sf16Progress" style="margin-top:13px"></div>';
+
+ gate.innerHTML='';
+ gate.appendChild(card);
+
+ /* --- Phần 1: đã có tài khoản (dùng lại đúng form và trình xử lý cũ) --- */
+ const haveBody=card.querySelector('#sf16HaveBody');
+ haveBody.appendChild(form);
+ form.innerHTML='';
+ form.appendChild(endpointField);
+ if(urlCheck)form.appendChild(urlCheck);
+ form.appendChild(usernameField);
+ form.appendChild(passwordField);
+ if(submitButton){submitButton.style.width='100%';submitButton.textContent='Đăng nhập quản trị';form.appendChild(submitButton)}
+ const hint=endpointField.querySelector('.field-hint');
+ if(hint)hint.textContent='Không nhập URL Gmail Bridge vào ô này.';
+
+ /* --- Phần 2: chưa có tài khoản --- */
+ const newBody=card.querySelector('#sf16NewBody');
+ if(setupForm){
+  const note=document.createElement('p');
+  note.className='sf16-hint';
+  note.innerHTML='Website chưa có tài khoản admin mặc định. Hãy tạo một tài khoản để vào phần quản trị và hoàn tất kết nối Google Drive.';
+  newBody.appendChild(note);
+  newBody.appendChild(setupForm);
+  setupForm.style.padding='0';
+  if(setupProgress){setupProgress.style.padding='0';newBody.appendChild(setupProgress)}
+ }else{
+  newBody.innerHTML=
+   '<p class="sf16-hint">Dùng tài khoản admin mặc định đã tạo trên thiết bị này. Cách này không cần URL Apps Script, phù hợp khi nhà trường chưa kết nối Google Drive.</p>'+
+   '<div class="formgrid">'+
+   '<div class="field full"><label>Tên đăng nhập mặc định</label><input id="sf16DefUser" value="'+esc(account.username||'')+'" autocomplete="username"></div>'+
+   '<div class="field full"><label>Mật khẩu</label><input id="sf16DefPass" type="password" autocomplete="current-password"></div>'+
+   '<div class="field full"><button class="btn primary" type="button" id="sf16DefLogin" style="width:100%">Đăng nhập bằng tài khoản mặc định</button></div>'+
+   '</div>'+
+   '<div class="sf16-sep">Tài khoản mặc định chỉ có trên trình duyệt này. Để dùng chung nhiều máy, hãy đăng nhập ở mục <b>Đã có tài khoản</b> bằng liên kết của nhà trường.</div>';
+  const runDefault=()=>{
+   const user=String((document.querySelector('#sf16DefUser')||{}).value||'').trim();
+   const pass=String((document.querySelector('#sf16DefPass')||{}).value||'');
+   const box=gate.querySelector('#hybridAdminProgress');
+   if(!user||!pass){if(box)box.innerHTML='<div class="notice bad">Hãy nhập đủ tên đăng nhập và mật khẩu.</div>';return}
+   endpointInput.value='';usernameInput.value=user;passwordInput.value=pass;
+   form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));
+  };
+  newBody.querySelector('#sf16DefLogin').onclick=runDefault;
+  newBody.querySelector('#sf16DefPass').addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();runDefault()}});
+ }
+
+ /* --- Ô thông báo dùng chung cho cả hai phần --- */
+ if(progress)card.querySelector('#sf16Progress').appendChild(progress);
+
+ /* --- Chuyển tab --- */
+ const panes=[...card.querySelectorAll('.sf16-pane')];
+ card.querySelectorAll('.sf16-tab').forEach(tab=>{
+  tab.onclick=()=>{
+   card.querySelectorAll('.sf16-tab').forEach(x=>x.classList.toggle('active',x===tab));
+   panes.forEach(pane=>pane.classList.toggle('hidden',pane.dataset.pane!==tab.dataset.sf16));
+   const box=gate.querySelector('#hybridAdminProgress');if(box)box.innerHTML='';
+  };
+ });
+ if(!hasDefault&&setupForm)card.querySelector('[data-sf16="new"]').click();
+
+ try{if(typeof installPasswordVisibility==='function')installPasswordVisibility(card)}catch{}
+}
+
+if(typeof renderAdminGate==='function'){
+ const before=renderAdminGate;
+ renderAdminGate=async function(...args){
+  const result=await before.apply(this,args);
+  try{tidyAdminGate()}catch{}
+  return result;
+ };
+ window.renderAdminGate=renderAdminGate;
+}
+setTimeout(()=>{try{tidyAdminGate()}catch{}},400);
+window.sf16TidyAdminGate=tidyAdminGate;
+
+})();
+/* ===== Kết thúc SmartForms 16.0 ===== */
+
+
+/* ===== SmartForms 17.0 · Rút gọn link phụ huynh (bản chạy được) =====
+   Lỗi cũ: gọi is.gd bằng fetch nên bị trình duyệt chặn CORS -> luôn báo thất bại.
+   Bản này gọi bằng JSONP (tham số callback mà is.gd/v.gd hỗ trợ sẵn) nên không còn bị chặn.
+   · Chỉ tạo link rút gọn từ chính link phụ huynh gốc, bỏ ô dán link ngắn tự tạo.
+   · Link đã tạo được lưu lại và dùng mãi; chỉ đổi khi admin tự bấm tạo link mới,
+     hoặc khi link phụ huynh gốc đổi (đổi URL Apps Script) thì hệ thống cảnh báo.
+   ================================================================= */
+(function installSmartForms17(){
+'use strict';
+if(window.__sf17Installed)return;window.__sf17Installed=true;
+
+(function css(){
+ if(document.getElementById('sf17Style'))return;
+ const style=document.createElement('style');style.id='sf17Style';
+ style.textContent=
+ '#sf13ShortPanel{display:none!important}'+
+ '.sf17-box{margin-top:14px;padding:15px;border:1px solid var(--line);border-radius:14px;background:#f8fbff}'+
+ '.sf17-box>b{display:block;margin-bottom:9px}'+
+ '.sf17-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}'+
+ '.sf17-row input{flex:1;min-width:210px}'+
+ '.sf17-link{font-weight:850;color:#0d5365;word-break:break-all;font-size:1.02rem}'+
+ '.sf17-hint{font-size:12px;color:#6a788f;margin-top:9px;line-height:1.7}'+
+ '.sf17-msg{margin-top:10px;font-size:12.5px;line-height:1.7}'+
+ '@media(max-width:600px){.sf17-row input{min-width:100%}}';
+ document.head.appendChild(style);
+})();
+
+/* ---------- JSONP: cách duy nhất gọi is.gd/v.gd từ trình duyệt mà không bị CORS ---------- */
+function jsonpOnce(url,timeout){
+ return new Promise((resolve,reject)=>{
+  const name='__sf17cb'+Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+  const script=document.createElement('script');
+  const timer=setTimeout(()=>finish(new Error('Dịch vụ rút gọn không phản hồi kịp.')),Number(timeout)||15000);
+  function finish(error,data){
+   clearTimeout(timer);
+   try{delete window[name]}catch{window[name]=undefined}
+   script.remove();
+   error?reject(error):resolve(data);
+  }
+  window[name]=data=>finish(null,data);
+  script.onerror=()=>finish(new Error('Không kết nối được dịch vụ rút gọn (mạng của trường có thể đang chặn).'));
+  script.src=url+(url.indexOf('?')>=0?'&':'?')+'callback='+name;
+  document.head.appendChild(script);
+ });
+}
+
+function cleanAlias(value){
+ return String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+  .replace(/đ/g,'d').replace(/Đ/g,'D').toLowerCase()
+  .replace(/[^a-z0-9_]+/g,'').slice(0,30);
+}
+
+const TAKEN=new Error('alias-taken');
+async function shortenLink(longUrl,alias){
+ const services=[{name:'is.gd',base:'https://is.gd/create.php'},{name:'v.gd',base:'https://v.gd/create.php'}];
+ let last='';
+ for(const service of services){
+  let url=service.base+'?format=json&url='+encodeURIComponent(longUrl);
+  if(alias)url+='&shorturl='+encodeURIComponent(alias);
+  let data=null;
+  try{data=await jsonpOnce(url,15000)}
+  catch(error){last=String(error&&error.message||error);continue}
+  if(data&&data.shorturl)return{short:String(data.shorturl),service:service.name};
+  const code=Number(data&&data.errorcode||0);
+  const message=String(data&&data.errormessage||'');
+  if(code===2||/already|taken|in use|not available/i.test(message)){
+   if(alias)throw TAKEN;
+   last='Dịch vụ '+service.name+' không cấp được link. '+message;
+   continue;
+  }
+  if(code===1){last='Link phụ huynh gốc không được dịch vụ chấp nhận: '+message;continue}
+  if(code===3){last='Dịch vụ '+service.name+' đang giới hạn số lần tạo. Hãy thử lại sau vài phút.';continue}
+  last=message||('Dịch vụ '+service.name+' không trả về link.');
+ }
+ throw new Error(last||'Chưa tạo được link rút gọn.');
+}
+
+async function saveShort(patch){
+ const current=(await idbGet('settings','drive'))||{id:'drive'};
+ const next=Object.assign({},current,patch,{id:'drive'});
+ await idbPut('settings',next);
+ return next;
+}
+async function copyText(text){
+ try{await navigator.clipboard.writeText(text);return true}
+ catch{
+  const area=document.createElement('textarea');
+  area.value=text;area.style.cssText='position:fixed;opacity:0';
+  document.body.appendChild(area);area.select();
+  let ok=false;try{ok=document.execCommand('copy')}catch{}
+  area.remove();return ok;
+ }
+}
+
+/* ---------- Khung giao diện ---------- */
+let building=false;
+async function injectPanel(){
+ if(building)return;
+ const source=document.querySelector('#parentShareLink')||document.querySelector('#publicParentLink');
+ if(!source||document.querySelector('#sf17Short'))return;
+ const host=source.closest('.link-box')||source.parentElement;
+ if(!host)return;
+ building=true;
+ try{
+  const panel=document.createElement('div');
+  panel.className='sf17-box';panel.id='sf17Short';
+  host.insertAdjacentElement('afterend',panel);
+  await draw(panel,source);
+ }finally{building=false}
+}
+
+async function draw(panel,source,message){
+ const settings=(await idbGet('settings','drive'))||{};
+ const saved=String(settings.parentShortLink||'');
+ const savedSource=String(settings.parentShortSource||'');
+ const alias=String(settings.parentShortName||'');
+ const current=String(source.value||'').trim();
+ const stale=!!saved&&!!savedSource&&!!current&&savedSource!==current;
+
+ if(saved&&!stale){
+  panel.innerHTML=
+   '<b>Link rút gọn gửi phụ huynh</b>'+
+   '<div class="sf17-link">'+esc(saved)+'</div>'+
+   '<div class="sf17-row" style="margin-top:11px">'+
+   '<button class="btn primary" type="button" id="sf17Copy">Sao chép link</button>'+
+   '<a class="btn secondary" href="'+esc(saved)+'" target="_blank" rel="noopener">Mở thử ↗</a>'+
+   '<button class="btn ghost" type="button" id="sf17New">Tạo link khác</button>'+
+   '</div>'+
+   '<div class="sf17-hint">Link này dùng được lâu dài, không tự đổi. Chỉ cần tạo lại khi nhà trường đổi URL Apps Script.'+
+   (alias?' Tên link đang dùng: <b>'+esc(alias)+'</b>.':'')+'</div>'+
+   '<div class="sf17-msg" id="sf17Msg">'+(message||'')+'</div>';
+  panel.querySelector('#sf17Copy').onclick=async()=>{
+   const button=panel.querySelector('#sf17Copy');
+   button.textContent=await copyText(saved)?'Đã sao chép':'Không sao chép được';
+   setTimeout(()=>{if(button.isConnected)button.textContent='Sao chép link'},1800);
+  };
+  panel.querySelector('#sf17New').onclick=async()=>{
+   if(!confirm('Tạo một link rút gọn khác?\n\nLink cũ vẫn chạy được, nhưng từ giờ hệ thống chỉ hiển thị link mới. Phụ huynh đã nhận link cũ sẽ không bị ảnh hưởng.'))return;
+   await saveShort({parentShortLink:'',parentShortName:'',parentShortSource:''});
+   await draw(panel,source);
+  };
+  return;
+ }
+
+ panel.innerHTML=
+  '<b>Link rút gọn gửi phụ huynh</b>'+
+  (stale?'<div class="notice warn" style="margin-bottom:11px">Link rút gọn đã lưu (<b>'+esc(saved)+'</b>) đang trỏ tới liên kết cũ của nhà trường. Hãy tạo link mới cho liên kết hiện tại.</div>':'')+
+  '<div class="sf17-hint" style="margin:0 0 10px">Tạo trực tiếp từ link phụ huynh gốc ở trên. Đặt tên dễ nhớ hoặc để trống cho hệ thống tự sinh.</div>'+
+  '<div class="sf17-row">'+
+  '<input id="sf17Alias" maxlength="30" placeholder="Tên link mong muốn, ví dụ: hosothcsabc" value="'+esc(alias)+'">'+
+  '<button class="btn primary" type="button" id="sf17Make">Tạo link rút gọn</button>'+
+  '</div>'+
+  '<div class="sf17-hint">Tên link chỉ gồm chữ thường, số và dấu gạch dưới, dài 5–30 ký tự. Link tạo xong được lưu lại và dùng mãi.</div>'+
+  '<div class="sf17-msg" id="sf17Msg">'+(message||'')+'</div>';
+
+ const aliasInput=panel.querySelector('#sf17Alias');
+ const msg=panel.querySelector('#sf17Msg');
+ panel.querySelector('#sf17Make').onclick=async()=>{
+  const button=panel.querySelector('#sf17Make');
+  const longUrl=String(source.value||'').trim();
+  if(!longUrl){msg.innerHTML='<span style="color:var(--bad)">Chưa có link phụ huynh. Hãy hoàn tất phần kết nối Drive phía trên trước.</span>';return}
+  const wanted=cleanAlias(aliasInput.value);
+  if(aliasInput.value.trim()&&wanted.length<5){msg.innerHTML='<span style="color:var(--bad)">Tên link phải từ 5 ký tự trở lên (chữ thường, số, gạch dưới).</span>';return}
+  button.disabled=true;button.textContent='Đang tạo…';
+  msg.textContent='Đang gửi yêu cầu tới dịch vụ rút gọn…';
+  try{
+   const result=await shortenLink(longUrl,wanted);
+   await saveShort({parentShortLink:result.short,parentShortName:wanted,parentShortSource:longUrl,parentShortAt:nowISO()});
+   await draw(panel,source,'<b style="color:#1d7a4c">✓ Đã tạo xong bằng '+esc(result.service)+'.</b> Hãy gửi link này cho phụ huynh.');
+  }catch(error){
+   button.disabled=false;button.textContent='Tạo link rút gọn';
+   if(error===TAKEN){
+    const suggestion=wanted+Math.floor(Math.random()*90+10);
+    aliasInput.value=suggestion;
+    msg.innerHTML='<span style="color:var(--bad)">Tên link “'+esc(wanted)+'” đã có người khác dùng.</span> Đã gợi ý tên khác, bấm tạo lại hoặc tự sửa.';
+   }else{
+    msg.innerHTML='<span style="color:var(--bad)">'+esc(String(error&&error.message||error))+'</span>';
+   }
+  }
+ };
+}
+
+/* ---------- Gắn lại sau mỗi lần dựng giao diện ---------- */
+let timer=null;
+function schedule(){
+ clearTimeout(timer);
+ timer=setTimeout(()=>{injectPanel().catch(()=>{})},90);
+}
+function boot(){
+ schedule();
+ const root=document.querySelector('main.wrap')||document.body;
+ new MutationObserver(schedule).observe(root,{childList:true,subtree:true});
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
+
+window.sf17Shorten=shortenLink;
+
+})();
+/* ===== Kết thúc SmartForms 17.0 ===== */
 
 </script></body></html>
