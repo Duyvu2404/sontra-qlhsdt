@@ -1289,10 +1289,10 @@ function doGet(e){
   const q=e.parameter||{},callback=/^[A-Za-z_$][\w$.]*$/.test(q.callback||'')?q.callback:'cb';
   try{
     if(q.action==='publicHealth')return jsonp_(callback,{ok:true,apiVersion:API_VERSION,publicUpload:true,maxPdfMb:10});
-    if(q.action==='publicCatalog')return jsonp_(callback,{ok:true,apiVersion:API_VERSION,forms:publicCatalog_()});
+    if(q.action==='publicCatalog')return jsonp_(callback,{ok:true,apiVersion:API_VERSION,forms:publicCatalog_(q.folder||'')});
     if(q.action==='publicRequestStatus')return jsonp_(callback,requestStatus_(q.requestId));
     if(q.action==='publicForm'){
-      const cfg=publicConfig_(q.formId);if(!cfg)return jsonp_(callback,{ok:false,error:'form unavailable'});
+      const cfg=publicConfig_(q.formId,q.folder);if(!cfg)return jsonp_(callback,{ok:false,error:'form unavailable'});
       const base=folder_(cfg.folderUrl),root=findChild_(base,'Bieu_mau'),item=root?findChild_(root,safe_(cfg.formId)):null;
       if(!item)return jsonp_(callback,{ok:false,error:'form not found'});
       const metas=item.getFilesByName('metadata.json');if(!metas.hasNext())return jsonp_(callback,{ok:false,error:'missing metadata'});
@@ -1302,7 +1302,7 @@ function doGet(e){
       return jsonp_(callback,{ok:true,form:meta,pdfBase64:Utilities.base64Encode(pdfs.next().getBlob().getBytes())});
     }
     if(q.action==='publicHas'){
-      const cfg=publicConfig_(q.formId);if(!cfg)return jsonp_(callback,{ok:false,error:'form unavailable'});
+      const cfg=publicConfig_(q.formId,q.folder);if(!cfg)return jsonp_(callback,{ok:false,error:'form unavailable'});
       const base=folder_(cfg.folderUrl),root=findChild_(base,'Ho_so'),item=root?findChild_(root,safe_(q.itemKey)):null;
       const metas=item?item.getFilesByName('metadata.json'):null,name=fileName_(q.pdfName||''),pdfs=item&&name?item.getFilesByName(name):null;
       return jsonp_(callback,{ok:true,exists:!!(item&&metas&&metas.hasNext()&&pdfs&&pdfs.hasNext())});
@@ -1712,6 +1712,7 @@ function jsonp_(callback,value){return ContentService.createTextOutput(callback+
  function assertGmailBridge(value){let c=gmailBridgeConfig(value);if(!validDriveBridgeUrl(c.endpoint))throw new Error('URL Apps Script không hợp lệ. Hãy dán URL Web App kết thúc bằng /exec.');if(!c.token)throw new Error('Chưa nhập SMARTFORMS_GMAIL_TOKEN.');return c}
  function gmailOnlyError(error){let raw=String(error?.message||error||'Không tạo được bản nháp Gmail.');if(/unauthorized/i.test(raw))return'Token Gmail không đúng với Apps Script đang triển khai.';if(/Chưa chạy setupSmartFormsGmail/i.test(raw))return'Hãy chạy setupSmartFormsGmail trong Apps Script, cấp quyền Gmail rồi sao chép token.';if(/permission|authorization|scope|access denied/i.test(raw))return'Apps Script chưa được cấp quyền Gmail. Hãy chạy lại setupSmartFormsGmail và bấm Cho phép.';if(/quota/i.test(raw))return'Tài khoản Gmail hoặc Apps Script đã chạm hạn mức hiện tại.';if(/10 MB|too large/i.test(raw))return'PDF vượt quá 10 MB nên Gmail không thể đính kèm.';if(/invalid action/i.test(raw))return'Apps Script đang dùng mã cũ. Hãy sao chép mã Gmail Bridge trong trang này và tạo phiên bản triển khai mới.';return raw}
  async function gmailBridgeHealth(){let c=assertGmailBridge(await gmailBridgeSettings()),r=await jsonp(c.endpoint,{action:'gmailHealth',token:c.token},30000);if(!r.ok)throw new Error(r.error||'Apps Script không phản hồi.');if(!String(r.apiVersion||'').includes('Gmail Bridge 1.1'))throw new Error('Apps Script đang dùng mã cũ. Hãy cập nhật Gmail Bridge 1.1.');return r}
+ window.GMAIL_BRIDGE_CODE=GMAIL_BRIDGE_CODE;window.sfGmailBridge={settings:gmailBridgeSettings,save:saveGmailBridgeSettings,health:gmailBridgeHealth};
  async function gmailBridgePostConfirmed(payload,timeout=150000){
    let c=assertGmailBridge(await gmailBridgeSettings()),requestId='gmail_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,9),started=Date.now(),attempt=0,lastError='';
    try{await fetch(c.endpoint,{method:'POST',mode:'no-cors',cache:'no-store',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({...payload,token:c.token,requestId})})}catch{throw new Error('Không chuyển được dữ liệu tới Apps Script. Hãy kiểm tra mạng và URL /exec.')}
@@ -1893,7 +1894,7 @@ function jsonp_(callback,value){return ContentService.createTextOutput(callback+
  /* ===== End chỉnh sửa hồ sơ ===== */
 
  /* ===== Google Drive phân cấp · thay thế đúng hồ sơ hiện tại ===== */
-const DRIVE_HIERARCHY_APPS_SCRIPT=String.raw`const API_VERSION='ST SmartForms Drive Hierarchy 12.2.0 · Hierarchy 7.0.1 compatibility · Shared Access 8.0.1 · Recovery 9.0 · Delete Sync 10.2 · Word/PDF Upload 11.0 · Public Forms 11.1 · Identity Lookup 12.0.1 · Record Delete 13.0 · Fast Sync 14.0';
+const DRIVE_HIERARCHY_APPS_SCRIPT=String.raw`const API_VERSION='ST SmartForms Drive Hierarchy 12.2.0 · Hierarchy 7.0.1 compatibility · Shared Access 8.0.1 · Recovery 9.0 · Delete Sync 10.2 · Word/PDF Upload 11.0 · Public Forms 11.1 · Identity Lookup 12.0.1 · Record Delete 13.0 · Fast Sync 14.0 · Fast Catalog 20.0';
 const SYSTEM_ROOT='ST SmartForms - Hồ sơ hành chính';
 const FORM_SOURCE='01 - Biểu mẫu gốc';
 const FORM_RECORDS='02 - Hồ sơ đã tiếp nhận';
@@ -1933,10 +1934,10 @@ function doPost(e){
       else{meta.id=String(meta.id||itemKey);meta.formId=String(meta.formId||data.formId||'');meta.formTitle=String(meta.formTitle||data.formTitle||'Ho so');writeApp_(base,itemKey,meta,recordName,data.fileBase64||data.wordBase64||data.pdfBase64,data.fileMime||'');saveApplicationIndex_(base,itemKey,meta)}
       return requestText_(requestId,true,'synced',{itemKey:itemKey,revision:Number(meta.revision||1),fileName:kind==='form'?pdfName:recordName});
     }
-    if(data.action==='formUnregister'){PropertiesService.getScriptProperties().deleteProperty('PUBLIC_FORM_'+safe_(data.formId));return requestText_(requestId,true,'unregistered')}
+    if(data.action==='formUnregister'){PropertiesService.getScriptProperties().deleteProperty('PUBLIC_FORM_'+safe_(data.formId));catalogCacheDrop_();return requestText_(requestId,true,'unregistered')}
     if(data.action==='driveDeleteForm'){
       const base=folder_(data.folder),formId=safe_(data.formId),home=formFolder_(base,formId,'',false);
-      PropertiesService.getScriptProperties().deleteProperty('PUBLIC_FORM_'+formId);
+      PropertiesService.getScriptProperties().deleteProperty('PUBLIC_FORM_'+formId);catalogCacheDrop_();
       if(home)home.setTrashed(true);bumpDriveList_(base);
       return requestText_(requestId,true,'form moved to trash',{formId:formId,deleted:!!home});
     }
@@ -1955,32 +1956,32 @@ function doGet(e){
   const q=e.parameter||{},callback=/^[A-Za-z_$][\w$.]*$/.test(q.callback||'')?q.callback:'cb';
   try{
     if(q.action==='publicHealth')return jsonp_(callback,{ok:true,apiVersion:API_VERSION,publicUpload:true,verifiedUpload:true,fileBase64:true,fileName:true,fileMime:true,wordUpload:true,maxFileMb:10});
-    if(q.action==='publicCatalog')return jsonp_(callback,{ok:true,apiVersion:API_VERSION,forms:publicCatalog_()});
+    if(q.action==='publicCatalog')return jsonp_(callback,{ok:true,apiVersion:API_VERSION,forms:publicCatalog_(q.folder||'')});
     if(q.action==='publicRequestStatus')return jsonp_(callback,requestStatus_(q.requestId));
     if(q.action==='adminStatus')return jsonp_(callback,adminAccountStatus_());
     if(q.action==='publicLookup')return jsonp_(callback,publicLookup_(q));
     if(q.action==='publicForm'){
-      const cfg=publicConfig_(q.formId);if(!cfg)return jsonp_(callback,{ok:false,error:'form unavailable'});
+      const cfg=publicConfig_(q.formId,q.folder);if(!cfg)return jsonp_(callback,{ok:false,error:'form unavailable'});
       const source=publicSource_(cfg),meta=source?readMeta_(source):null;
       if(!meta||!meta.published)return jsonp_(callback,{ok:false,error:'form unavailable'});
       const pdf=readPdf_(source,meta._drivePdfName);if(!pdf)return jsonp_(callback,{ok:false,error:'missing pdf'});
       return jsonp_(callback,{ok:true,form:meta,pdfBase64:Utilities.base64Encode(pdf.getBlob().getBytes())});
     }
     if(q.action==='publicWordTemplate'){
-      const cfg=publicConfig_(q.formId);if(!cfg)return jsonp_(callback,{ok:false,error:'form unavailable'});
+      const cfg=publicConfig_(q.formId,q.folder);if(!cfg)return jsonp_(callback,{ok:false,error:'form unavailable'});
       const source=publicSource_(cfg),meta=source?readMeta_(source):null,word=meta?readWord_(source,meta._driveWordName):null;
       if(!meta||!meta.published||!word)return jsonp_(callback,{ok:false,error:'word template unavailable'});
       return jsonp_(callback,{ok:true,wordName:word.getName(),wordMime:word.getMimeType(),wordBase64:Utilities.base64Encode(word.getBlob().getBytes())});
     }
     if(q.action==='publicHas'){
-      const cfg=publicConfig_(q.formId);if(!cfg)return jsonp_(callback,{ok:false,error:'form unavailable'});
+      const cfg=publicConfig_(q.formId,q.folder);if(!cfg)return jsonp_(callback,{ok:false,error:'form unavailable'});
       const base=folder_(cfg.folderUrl),home=formFolder_(base,cfg.formId,cfg.title,false),item=home?appFolder_(home,q.itemKey,{},false):null,meta=item?readMeta_(item):null,file=meta?readRecordFile_(item,meta):null;
       return jsonp_(callback,{ok:true,exists:!!(item&&meta&&file),revision:Number(meta&&meta.revision||0),fileName:file?file.getName():''});
     }
     requireToken_(q.token);
     if(q.action==='bridgeHealth')return jsonp_(callback,{ok:true,apiVersion:API_VERSION,serviceAccount:Session.getEffectiveUser().getEmail()||Session.getActiveUser().getEmail()||'',writeService:'DriveApp'});
     if(q.action==='requestStatus')return jsonp_(callback,requestStatus_(q.requestId));
-    if(q.action==='adminCatalog')return jsonp_(callback,{ok:true,apiVersion:API_VERSION,folders:adminCatalog_()});
+    if(q.action==='adminCatalog')return jsonp_(callback,{ok:true,apiVersion:API_VERSION,folders:adminCatalog_(q.folder||'')});
     const base=folder_(q.folder);
     if(q.action==='driveHealth'){
       rememberRoot_(base);
@@ -2006,7 +2007,7 @@ function doGet(e){
 }
 
 function publicUpload_(data,requestId){
-  const cfg=publicConfig_(data.formId),b64=String(data.fileBase64||data.wordBase64||data.pdfBase64||''),itemKey=safe_(data.itemKey),fileName=recordFileName_(data.fileName||data.wordName||data.pdfName||'hoso.pdf',data.fileMime||'');
+  const cfg=publicConfig_(data.formId,data.folder),b64=String(data.fileBase64||data.wordBase64||data.pdfBase64||''),itemKey=safe_(data.itemKey),fileName=recordFileName_(data.fileName||data.wordName||data.pdfName||'hoso.pdf',data.fileMime||'');
   if(!cfg)return requestText_(requestId,false,'form unavailable');
   if(!itemKey||itemKey==='item')return requestText_(requestId,false,'invalid item key');
   if(!b64)return requestText_(requestId,false,'missing file data');
@@ -2184,9 +2185,9 @@ function saveApplicationIndex_(base,itemKey,meta){
   const code=String(meta&&meta.code||'').toUpperCase().replace(/\s+/g,'');if(!code||!base)return;
   PropertiesService.getScriptProperties().setProperty(applicationCodeKey_(code),JSON.stringify({code:code,formId:String(meta.formId||''),itemKey:String(itemKey||meta.id||''),folderId:base.getId(),updatedAt:String(meta.lastEditedAt||meta.updatedAt||meta.submittedAt||new Date().toISOString())}));
 }
-function findApplicationIndex_(code){
+function findApplicationIndex_(code,folderValue){
   const props=PropertiesService.getScriptProperties(),raw=props.getProperty(applicationCodeKey_(code));if(raw)try{return JSON.parse(raw)}catch(err){}
-  const configs=adminCatalog_(),seen={};for(let i=0;i<configs.length;i++){try{const base=folder_(configs[i].folderUrl),baseId=base.getId();if(seen[baseId])continue;seen[baseId]=true;const root=systemRoot_(base,false);if(!root)continue;const homes=root.getFolders();while(homes.hasNext()){const home=homes.next(),records=findChild_(home,FORM_RECORDS);if(!records)continue;const folders=records.getFolders();while(folders.hasNext()){const item=folders.next(),meta=readMeta_(item);if(meta&&String(meta.code||'').toUpperCase().replace(/\s+/g,'')===code){const found={code:code,formId:String(meta.formId||markedId_(home.getName())),itemKey:String(meta.id||markedId_(item.getName())),folderId:baseId};props.setProperty(applicationCodeKey_(code),JSON.stringify(found));return found}}}}catch(err){}}
+  const configs=adminCatalog_(folderValue),seen={};for(let i=0;i<configs.length;i++){try{const base=folder_(configs[i].folderUrl),baseId=base.getId();if(seen[baseId])continue;seen[baseId]=true;const root=systemRoot_(base,false);if(!root)continue;const homes=root.getFolders();while(homes.hasNext()){const home=homes.next(),records=findChild_(home,FORM_RECORDS);if(!records)continue;const folders=records.getFolders();while(folders.hasNext()){const item=folders.next(),meta=readMeta_(item);if(meta&&String(meta.code||'').toUpperCase().replace(/\s+/g,'')===code){const found={code:code,formId:String(meta.formId||markedId_(home.getName())),itemKey:String(meta.id||markedId_(item.getName())),folderId:baseId};props.setProperty(applicationCodeKey_(code),JSON.stringify(found));return found}}}}catch(err){}}
   return null;
 }
 function publicIdentitySearch_(data){
@@ -2195,7 +2196,7 @@ function publicIdentitySearch_(data){
  const cache=CacheService.getScriptCache(),rate='IDENTITY_SEARCH_RATE',count=Number(cache.get(rate)||0);
  if(count>=40)throw new Error('rate limited');cache.put(rate,String(count+1),60);
  const roots={},results=[],seen={};
- for(const cfg of adminCatalog_()){
+ for(const cfg of adminCatalog_(data.folder)){
   const base=folder_(cfg.folderUrl),rootId=base.getId();if(roots[rootId])continue;roots[rootId]=true;
   const root=systemRoot_(base,false);if(!root)continue;
   const homes=root.getFolders();while(homes.hasNext()){
@@ -2216,7 +2217,7 @@ function publicIdentitySearch_(data){
 function publicLookup_(query){
   const cache=CacheService.getScriptCache(),rateKey='PUBLIC_LOOKUP_RATE',count=Number(cache.get(rateKey)||0);if(count>=160)return{ok:false,error:'rate limited'};cache.put(rateKey,String(count+1),60);
   const code=String(query.applicationCode||'').toUpperCase().replace(/\s+/g,''),wanted=String(query.proofHash||'').toLowerCase();if(!/^ST-[A-Z0-9-]{6,40}$/.test(code)||!/^[a-f0-9]{64}$/.test(wanted))return{ok:false,error:'invalid verification'};
-  const index=findApplicationIndex_(code);if(!index)return{ok:false,error:'not found'};
+  const index=findApplicationIndex_(code,query.folder);if(!index)return{ok:false,error:'not found'};
   try{const base=folder_(index.folderId),home=formFolder_(base,index.formId,'',false),item=home?appFolder_(home,index.itemKey,{},false):null,meta=readMeta_(item);if(!meta||!parentProofHashes_(meta).some(function(hash){return secureEqual_(hash,wanted)}))return{ok:false,error:'not found'};const file=readRecordFile_(item,meta);if(!file)return{ok:false,error:'missing file'};saveApplicationIndex_(base,index.itemKey,meta);const clean=JSON.parse(JSON.stringify(meta)),b64=Utilities.base64Encode(file.getBlob().getBytes()),out={ok:true,app:clean,fileBase64:b64,fileName:file.getName(),fileMime:file.getMimeType(),editToken:parentEditToken_(index.itemKey,wanted),apiVersion:API_VERSION};delete clean._parentEditToken;if(/\.pdf$/i.test(file.getName()))out.pdfBase64=b64;else out.wordBase64=b64;return out}catch(err){return{ok:false,error:'not found'}}
 }
 
@@ -2228,10 +2229,14 @@ function publicSource_(cfg){
   for(const candidate of [legacy,base]){const meta=readMeta_(candidate);if(meta&&String(meta.id)===String(cfg.formId)&&meta.published===true&&readPdf_(candidate,meta._drivePdfName))return candidate}
   return null;
 }
-function publicConfig_(formId){const raw=PropertiesService.getScriptProperties().getProperty('PUBLIC_FORM_'+safe_(formId));if(!raw)return null;try{const cfg=JSON.parse(raw);return cfg&&cfg.enabled&&(cfg.folderUrl||cfg.folderId)?Object.assign({},cfg,{formId:String(cfg.formId||formId),folderUrl:cfg.folderUrl||cfg.folderId}):null}catch(err){return null}}
-function savePublicConfig_(meta,folderUrl){if(!meta||!meta.id)return;const cfg={formId:String(meta.id),folderUrl:String(folderUrl||''),enabled:!!meta.published,title:String(meta.title||'Bieu mau'),description:String(meta.description||''),updatedAt:String(meta.updatedAt||new Date().toISOString()),createdAt:String(meta.createdAt||''),sectionCount:Array.isArray(meta.sections)?meta.sections.length:1,recognizerVersion:String(meta.recognizerVersion||''),hasWordTemplate:!!(meta.hasWordTemplate||meta._driveWordName)};PropertiesService.getScriptProperties().setProperty('PUBLIC_FORM_'+safe_(meta.id),JSON.stringify(cfg))}
-function publicCatalog_(){const all=PropertiesService.getScriptProperties().getProperties(),out=[];Object.keys(all).filter(function(k){return k.indexOf('PUBLIC_FORM_')===0}).forEach(function(k){try{const x=JSON.parse(all[k]),cfg=publicConfig_(x.formId||k.slice(12));if(cfg&&publicSource_(cfg))out.push({id:cfg.formId,title:x.title,description:x.description,updatedAt:x.updatedAt,createdAt:x.createdAt,sectionCount:x.sectionCount,recognizerVersion:x.recognizerVersion,hasWordTemplate:!!x.hasWordTemplate})}catch(err){}});return out.sort(function(a,b){return String(b.updatedAt).localeCompare(String(a.updatedAt))})}
-function adminCatalog_(){const all=PropertiesService.getScriptProperties().getProperties(),out=[];Object.keys(all).filter(function(k){return k.indexOf('PUBLIC_FORM_')===0}).forEach(function(k){try{const x=JSON.parse(all[k]);if(x.folderUrl)out.push({formId:String(x.formId||k.slice(12)),folderUrl:String(x.folderUrl),enabled:!!x.enabled,title:String(x.title||'Bieu mau')})}catch(err){}});return out}
+function formConfigsFromDrive_(base){const out=[],root=systemRoot_(base,false);if(!root)return out;const homes=root.getFolders();while(homes.hasNext()){const home=homes.next(),source=findChild_(home,FORM_SOURCE),meta=source?readMeta_(source):null;if(!meta||!meta.id)continue;out.push({base:base,folderUrl:'https://drive.google.com/drive/folders/'+base.getId(),home:home,source:source,meta:meta,formId:String(meta.id),title:String(meta.title||home.getName())})}return out}
+function publicConfigFromDrive_(base,formId){const hit=formConfigsFromDrive_(base).find(function(x){return String(x.formId)===String(formId)&&x.meta.published===true});if(!hit)return null;const meta=hit.meta;return{formId:hit.formId,folderUrl:hit.folderUrl,enabled:true,title:String(meta.title||hit.title),description:String(meta.description||''),updatedAt:String(meta.updatedAt||meta.createdAt||''),createdAt:String(meta.createdAt||''),sectionCount:Array.isArray(meta.sections)?meta.sections.length:1,recognizerVersion:String(meta.recognizerVersion||''),hasWordTemplate:!!(meta.hasWordTemplate||meta._driveWordName)}}
+function publicConfig_(formId,folderValue){const raw=PropertiesService.getScriptProperties().getProperty('PUBLIC_FORM_'+safe_(formId));if(raw)try{const cfg=JSON.parse(raw);if(cfg&&cfg.enabled&&(cfg.folderUrl||cfg.folderId))return Object.assign({},cfg,{formId:String(cfg.formId||formId),folderUrl:cfg.folderUrl||cfg.folderId})}catch(err){}try{const rootValue=String(folderValue||PropertiesService.getScriptProperties().getProperty('SMARTFORMS_ROOT_FOLDER_ID')||'');if(rootValue)return publicConfigFromDrive_(folder_(rootValue),formId)}catch(err){}return null}
+function savePublicConfig_(meta,folderUrl){if(!meta||!meta.id)return;const cfg={formId:String(meta.id),folderUrl:String(folderUrl||''),enabled:!!meta.published,title:String(meta.title||'Bieu mau'),description:String(meta.description||''),updatedAt:String(meta.updatedAt||new Date().toISOString()),createdAt:String(meta.createdAt||''),sectionCount:Array.isArray(meta.sections)?meta.sections.length:1,recognizerVersion:String(meta.recognizerVersion||''),hasWordTemplate:!!(meta.hasWordTemplate||meta._driveWordName)};PropertiesService.getScriptProperties().setProperty('PUBLIC_FORM_'+safe_(meta.id),JSON.stringify(cfg));catalogCacheDrop_()}
+function catalogCacheDrop_(){try{CacheService.getScriptCache().remove('SF_PUBLIC_CATALOG_V20')}catch(err){}}
+function publicCatalog_(folderValue){try{const rootValue=String(folderValue||PropertiesService.getScriptProperties().getProperty('SMARTFORMS_ROOT_FOLDER_ID')||'');if(rootValue){const base=folder_(rootValue),cacheKey='SF_PUBLIC_CATALOG_DRIVE_'+base.getId(),cache=CacheService.getScriptCache(),hit=cache.get(cacheKey);if(hit)try{return JSON.parse(hit)}catch(err){}const out=formConfigsFromDrive_(base).filter(function(x){return x.meta.published===true}).map(function(x){const meta=x.meta;return{id:x.formId,title:String(meta.title||x.title),description:String(meta.description||''),updatedAt:String(meta.updatedAt||meta.createdAt||''),createdAt:String(meta.createdAt||''),sectionCount:Array.isArray(meta.sections)?meta.sections.length:1,recognizerVersion:String(meta.recognizerVersion||''),hasWordTemplate:!!(meta.hasWordTemplate||meta._driveWordName)}}).sort(function(a,b){return String(b.updatedAt).localeCompare(String(a.updatedAt))});try{if(JSON.stringify(out).length<95000)cache.put(cacheKey,JSON.stringify(out),120)}catch(err){}return out}}catch(err){}const cache=CacheService.getScriptCache(),hit=cache.get('SF_PUBLIC_CATALOG_V20');if(hit){try{return JSON.parse(hit)}catch(err){}}const out=publicCatalogRaw_();try{const raw=JSON.stringify(out);if(raw.length<95000)cache.put('SF_PUBLIC_CATALOG_V20',raw,120)}catch(err){}return out}
+function publicCatalogRaw_(){const all=PropertiesService.getScriptProperties().getProperties(),out=[];Object.keys(all).filter(function(k){return k.indexOf('PUBLIC_FORM_')===0}).forEach(function(k){try{const x=JSON.parse(all[k]),cfg=publicConfig_(x.formId||k.slice(12));if(cfg&&publicSource_(cfg))out.push({id:cfg.formId,title:x.title,description:x.description,updatedAt:x.updatedAt,createdAt:x.createdAt,sectionCount:x.sectionCount,recognizerVersion:x.recognizerVersion,hasWordTemplate:!!x.hasWordTemplate})}catch(err){}});return out.sort(function(a,b){return String(b.updatedAt).localeCompare(String(a.updatedAt))})}
+function adminCatalog_(folderValue){try{const rootValue=String(folderValue||PropertiesService.getScriptProperties().getProperty('SMARTFORMS_ROOT_FOLDER_ID')||'');if(rootValue){const base=folder_(rootValue);return formConfigsFromDrive_(base).map(function(x){return{formId:x.formId,folderUrl:x.folderUrl,enabled:x.meta.published===true,title:x.title}})}}catch(err){}const all=PropertiesService.getScriptProperties().getProperties(),out=[];Object.keys(all).filter(function(k){return k.indexOf('PUBLIC_FORM_')===0}).forEach(function(k){try{const x=JSON.parse(all[k]);if(x.folderUrl)out.push({formId:String(x.formId||k.slice(12)),folderUrl:String(x.folderUrl),enabled:!!x.enabled,title:String(x.title||'Bieu mau')})}catch(err){}});return out}
 function folderRef_(value){const raw=String(value||'').trim();let decoded=raw;try{decoded=decodeURIComponent(raw)}catch(err){}const match=decoded.match(/\/folders\/([-\w]{15,})/i)||decoded.match(/[?&]id=([-\w]{15,})/i)||decoded.match(/^([-\w]{15,})$/),id=(match||[])[1];if(!id)throw new Error('Link thu muc Drive khong hop le');const keyMatch=decoded.match(/[?&]resourcekey=([^&#]+)/i);let resourceKey='';if(keyMatch)try{resourceKey=decodeURIComponent(keyMatch[1])}catch(err){resourceKey=keyMatch[1]}return{id:id,resourceKey:resourceKey}}
 function folder_(value){const ref=folderRef_(value);return ref.resourceKey?DriveApp.getFolderByIdAndResourceKey(ref.id,ref.resourceKey):DriveApp.getFolderById(ref.id)}
 function findChild_(parent,name){const found=parent.getFoldersByName(name);return found.hasNext()?found.next():null}
@@ -2252,6 +2257,7 @@ function errorText_(err){return String(err&&err.message||err||'Loi Apps Script')
  function driveHierarchyRoot(settings){let candidates=[settings?.folderUrl,...Object.values(settings?.formFolders||{})].filter(Boolean);for(let value of candidates)try{return normalizeDriveFolderUrl(value)}catch{}return''}
  function driveHierarchyError(error){let raw=String(error?.message||error||'Lỗi Google Drive.');if(/stale revision/i.test(raw))return'Drive đang có phiên bản hồ sơ mới hơn. Hãy lấy dữ liệu Drive về trước khi sửa tiếp.';if(/Hierarchy 7\.0|bản cũ|apiVersion/i.test(raw))return'Apps Script đang dùng bản cũ. Hãy sao chép mã Drive Hierarchy 7.0, thay toàn bộ mã cũ và Deploy phiên bản mới.';return driveBridgeError(raw)}
  async function driveHierarchyHealth(root,{force=false}={}){let settings=await driveBridgeSettings(),cfg=assertDriveBridge(settings),folder=normalizeDriveFolderUrl(root||driveHierarchyRoot(settings));if(!folder)throw new Error('Chưa nhập thư mục mẹ Google Drive.');let key=cfg.endpoint+'|'+folder,cached=driveHealthCache.get(key);if(!force&&cached&&Date.now()-cached.checkedAt<DRIVE_HEALTH_CACHE_MS)return cached.value;let result=await jsonp(cfg.endpoint,{action:'driveHealth',token:cfg.token,folder},45000);if(!result.ok)throw new Error(result.error||'Không ghi được thư mục mẹ.');if(!String(result.apiVersion||'').includes('Hierarchy 7.0'))throw new Error('Apps Script đang là bản cũ.');driveHealthCache.set(key,{checkedAt:Date.now(),value:result});state.driveServiceAccount=result.serviceAccount||'';return result}
+ window.driveHierarchyHealth=driveHierarchyHealth;
  async function verifyDriveHierarchy(root,kind,formId,itemKey,pdfName){let settings=await driveBridgeSettings(),cfg=assertDriveBridge(settings),last='';for(let attempt=0;attempt<5;attempt++){if(attempt)await driveWait(450*(attempt+1));try{let result=await jsonp(cfg.endpoint,{action:'driveHas',token:cfg.token,folder:root,kind,formId,itemKey,pdfName},35000);if(result.ok&&result.exists)return result;last=result.error||'Chưa thấy file'}catch(error){last=error.message}}throw new Error(last||'Drive chưa xác nhận PDF mới nhất.')}
 
  bootstrapPublicService=async function(){let endpoint=await driveBridgeEndpoint();state.publicCatalog=[];state.publicServiceReady=false;state.publicServiceExpected=!!endpoint;state.publicServiceError='';if(!endpoint)return false;try{let result=await jsonp(endpoint,{action:'publicCatalog'},35000);if(!result.ok||!String(result.apiVersion||'').includes('Hierarchy 7.0'))throw new Error(result.error||'Apps Script chưa dùng Drive Hierarchy 7.0.');state.publicCatalog=Array.isArray(result.forms)?result.forms:[];state.publicServiceReady=true;return true}catch(error){state.publicServiceError=error.message;return false}};
@@ -2777,7 +2783,7 @@ const viewAppBeforeWordMode=viewApp;
 viewApp=async function(id){let app=await idbGet('apps',id);if(!applicationIsWord(app))return viewAppBeforeWordMode(id);$('#modal .modalbox').classList.remove('wide');$('#modalTitle').textContent='Hồ sơ '+app.code;$('#modalBody').innerHTML=`<div class="source-banner"><div class="source-icon">W</div><div><b>${esc(app.identity?.studentName||app.code)}</b><span>${esc(app.formTitle||'Hồ sơ Word')} · Bản ${applicationRevision(app)} · ${esc(fmtTime(applicationLatestAt(app)))}</span></div></div><div class="notice ${app.needsReview?'warn':'ok'}" style="margin-bottom:14px"><b>Word hiện hành: Bản ${applicationRevision(app)}</b>${app.needsReview?' · Phụ huynh vừa cập nhật, cần kiểm tra.':''}</div><div class="info-grid">${identitySchema.map(([key,label])=>info(label,app.identity?.[key])).join('')}</div><div class="actions" style="margin-top:16px"><button class="btn secondary" id="adminDownloadWord">Tải Word</button><button class="btn secondary" id="adminReplaceWord">Cập nhật file Word</button><button class="btn danger" id="adminDeleteWordApp">Xóa hồ sơ</button></div>`;openModal();$('#adminDownloadWord').onclick=()=>downloadLatestApplicationWord(id).catch(error=>alert(error.message));$('#adminReplaceWord').onclick=()=>{closeModal();openWordSubmission(app.formId,app.id,'admin')};$('#adminDeleteWordApp').onclick=async()=>{if(confirm('Xóa hồ sơ này khỏi danh sách trên thiết bị?')){await idbDel('apps',id);closeModal();renderRecords();renderDashboard()}}};
 async function editApplication(id,actor='admin'){if(actor==='parent'&&window.openParentEditor)return window.openParentEditor(id);await viewAppBeforeWordMode(id);let button=$('#editApplicationButton');if(button)button.click()}
 
-renderRecords=async function(){let apps=(await idbAll('apps')).sort((a,b)=>String(applicationLatestAt(b)).localeCompare(String(applicationLatestAt(a)))),groups=new Map;for(let app of apps){let key=app.formId||app.formTitle||'other';if(!groups.has(key))groups.set(key,{title:app.formTitle||'Hồ sơ khác',items:[]});groups.get(key).items.push(app)}$('#av-records').innerHTML=`<div class="sectionHead"><div><h2>Quản lý hồ sơ</h2><p>PDF và Word được xếp theo từng biểu mẫu; bản cập nhật mới nhất luôn nằm trên cùng.</p></div><div class="actions"><button class="btn secondary" id="recordsPullDrive">Tải dữ liệu mới nhất</button><button class="btn secondary" id="recordsSyncDrive">Đồng bộ lên Google Drive</button></div></div><div class="admin-help"><b>Quy trình:</b> tìm hồ sơ → xem PDF hoặc tải Word → kiểm tra biểu mẫu xác nhận → cập nhật trạng thái. Tệp phụ huynh sửa lại sẽ thay đúng bản hiện hành.</div><div class="card panel"><div class="actions" style="margin-bottom:14px"><input id="recSearch" placeholder="Tìm học sinh, mã hồ sơ…" style="flex:1"><select id="recStatus" style="width:auto"><option value="">Tất cả trạng thái</option>${['Mới tiếp nhận','Đang xử lý','Cần bổ sung','Đã duyệt','Hoàn thành'].map(value=>`<option>${value}</option>`).join('')}</select></div><div id="recList"></div><div id="recordDriveProgress" style="margin-top:12px"></div></div>`;let draw=()=>{let query=foldVN($('#recSearch').value),status=$('#recStatus').value,html='';for(let group of groups.values()){let items=group.items.filter(app=>(!status||app.status===status)&&(!query||foldVN(app.code+' '+app.identity?.studentName+' '+app.identity?.parentName+' '+app.formTitle).includes(query)));if(!items.length)continue;let latest=items[0];html+=`<details class="record-parent" open style="margin-bottom:14px"><summary><div style="display:flex;align-items:center;gap:12px"><div class="source-icon" style="width:38px;height:38px;border-radius:12px">📁</div><div><b>${esc(group.title)}</b><div class="muted" style="font-size:11px;margin-top:3px">${items.length} hồ sơ · mới nhất ${fmtTime(applicationLatestAt(latest))}</div></div></div></summary><div class="student-records" style="padding:14px">${items.map(app=>{let revision=applicationRevision(app),driveOk=app.driveSyncStatus==='Đã chuyển lên Drive',isWord=applicationIsWord(app);return`<div class="student-card"><div class="student-card-head"><div class="student-avatar">${isWord?'W':esc(initials(app.identity?.studentName||'HS'))}</div><div class="student-main"><b>${esc(app.identity?.studentName||'Chưa có họ tên')}</b><small>${esc(app.identity?.className||'—')} · ${fmtTime(applicationLatestAt(app))}</small></div><span class="student-code">${esc(app.code)}</span></div><div class="student-card-body"><div class="kv"><span>${isWord?'Word hiện hành':'PDF hiện hành'}</span><strong>Bản ${revision}</strong></div><div class="kv"><span>Google Drive</span><strong style="color:${driveOk?'var(--ok)':'var(--warn)'}">${driveOk?'Đã cập nhật':'Chờ đồng bộ'}</strong></div></div>${app.needsReview?'<div class="notice warn" style="margin-bottom:12px">Phụ huynh vừa cập nhật — cần kiểm tra bản mới.</div>':''}<div class="student-foot"><select class="status-select" onchange="setStatus('${esc(app.id)}',this.value)">${statusOptions(app.status)}</select><div class="actions">${isWord?`<button class="btn secondary" onclick="openWordSubmission('${esc(app.formId)}','${esc(app.id)}','admin')">Cập nhật Word</button>`:`<button class="btn secondary" onclick="editApplication('${esc(app.id)}','admin')">Chỉnh sửa</button>`}<button class="btn secondary" onclick="viewApp('${esc(app.id)}')">Xem →</button></div></div></div>`}).join('')}</div></details>`}$('#recList').innerHTML=html||'<div class="notice">Không có hồ sơ phù hợp.</div>'};$('#recSearch').oninput=draw;$('#recStatus').onchange=draw;draw();$('#recordsPullDrive').onclick=async()=>{let box=$('#recordDriveProgress');box.innerHTML='<div class="notice">Đang tải dữ liệu từ Drive…</div>';try{let result=await pullDriveHierarchy();box.innerHTML=`<div class="notice ok">Đã cập nhật ${result.restoredForms||0} biểu mẫu và ${result.restoredApps||0} hồ sơ.</div>`;await renderRecords()}catch(error){box.innerHTML=`<div class="notice bad">${esc(driveHierarchyError(error))}</div>`}};$('#recordsSyncDrive').onclick=async()=>{let target=$('#recordDriveProgress');target.id='driveProgress';try{await syncAllDriveHierarchy()}finally{target.id='recordDriveProgress'}}};
+renderRecords=async function(){let apps=(await idbAll('apps')).sort((a,b)=>String(applicationLatestAt(b)).localeCompare(String(applicationLatestAt(a)))),groups=new Map;for(let app of apps){let key=app.formId||app.formTitle||'other';if(!groups.has(key))groups.set(key,{title:app.formTitle||'Hồ sơ khác',items:[]});groups.get(key).items.push(app)}$('#av-records').innerHTML=`<div class="sectionHead"><div><h2>Quản lý hồ sơ</h2><p>PDF và Word được xếp theo từng biểu mẫu; bản cập nhật mới nhất luôn nằm trên cùng.</p></div><div class="actions"><button class="btn secondary" id="recordsPullDrive">Tải dữ liệu mới nhất</button><button class="btn secondary" id="recordsSyncDrive">Đồng bộ lên Google Drive</button></div></div><div class="admin-help"><b>Quy trình:</b> tìm hồ sơ → xem PDF hoặc tải Word → kiểm tra biểu mẫu xác nhận → cập nhật trạng thái. Tệp phụ huynh sửa lại sẽ thay đúng bản hiện hành.</div><div class="card panel"><div class="actions" style="margin-bottom:14px"><input id="recSearch" placeholder="Tìm học sinh, mã hồ sơ…" style="flex:1"><select id="recStatus" style="width:auto"><option value="">Tất cả trạng thái</option>${['Mới tiếp nhận','Đang xử lý','Cần bổ sung','Đã duyệt','Hoàn thành'].map(value=>`<option>${value}</option>`).join('')}</select></div><div id="recList"></div><div id="recordDriveProgress" style="margin-top:12px"></div></div>`;let draw=()=>{let query=foldVN($('#recSearch').value),status=$('#recStatus').value,html='';for(let group of groups.values()){let items=group.items.filter(app=>(!status||app.status===status)&&(!query||foldVN(app.code+' '+app.identity?.studentName+' '+app.identity?.parentName+' '+app.formTitle).includes(query)));if(!items.length)continue;let latest=items[0];html+=`<details class="record-parent" open style="margin-bottom:14px"><summary><div style="display:flex;align-items:center;gap:12px"><div class="source-icon" style="width:38px;height:38px;border-radius:12px">📁</div><div><b>${esc(group.title)}</b><div class="muted" style="font-size:11px;margin-top:3px">${items.length} hồ sơ · mới nhất ${fmtTime(applicationLatestAt(latest))}</div></div></div></summary><div class="student-records" style="padding:14px">${items.map(app=>{let revision=applicationRevision(app),driveOk=app.driveSyncStatus==='Đã chuyển lên Drive',isWord=applicationIsWord(app);return`<div class="student-card"><div class="student-card-head"><div class="student-avatar">${isWord?'W':esc(initials(app.identity?.studentName||'HS'))}</div><div class="student-main"><b>${esc(app.identity?.studentName||'Chưa có họ tên')}</b><small>${esc(app.identity?.className||'—')} · ${fmtTime(applicationLatestAt(app))}</small></div><div class="sf24-codebox"><span class="sf24-type ${isWord?'word':'pdf'}" title="Dạng tệp phụ huynh gửi về">${isWord?'📄 Word':'📕 PDF'}</span><span class="student-code">${esc(app.code)}</span></div></div><div class="student-card-body"><div class="kv"><span>${isWord?'Word hiện hành':'PDF hiện hành'}</span><strong>Bản ${revision}</strong></div><div class="kv"><span>Google Drive</span><strong style="color:${driveOk?'var(--ok)':'var(--warn)'}">${driveOk?'Đã cập nhật':'Chờ đồng bộ'}</strong></div></div>${app.needsReview?'<div class="notice warn" style="margin-bottom:12px">Phụ huynh vừa cập nhật — cần kiểm tra bản mới.</div>':''}<div class="student-foot"><select class="status-select" onchange="setStatus('${esc(app.id)}',this.value)">${statusOptions(app.status)}</select><div class="actions">${isWord?`<button class="btn secondary" onclick="openWordSubmission('${esc(app.formId)}','${esc(app.id)}','admin')">Cập nhật Word</button>`:`<button class="btn secondary" onclick="editApplication('${esc(app.id)}','admin')">Chỉnh sửa</button>`}<button class="btn secondary" onclick="viewApp('${esc(app.id)}')">Xem →</button></div></div></div>`}).join('')}</div></details>`}$('#recList').innerHTML=html||'<div class="notice">Không có hồ sơ phù hợp.</div>'};$('#recSearch').oninput=draw;$('#recStatus').onchange=draw;draw();$('#recordsPullDrive').onclick=async()=>{let box=$('#recordDriveProgress');box.innerHTML='<div class="notice">Đang tải dữ liệu từ Drive…</div>';try{let result=await pullDriveHierarchy();box.innerHTML=`<div class="notice ok">Đã cập nhật ${result.restoredForms||0} biểu mẫu và ${result.restoredApps||0} hồ sơ.</div>`;await renderRecords()}catch(error){box.innerHTML=`<div class="notice bad">${esc(driveHierarchyError(error))}</div>`}};$('#recordsSyncDrive').onclick=async()=>{let target=$('#recordDriveProgress');target.id='driveProgress';try{await syncAllDriveHierarchy()}finally{target.id='recordDriveProgress'}}};
 
 const pullDriveHierarchyBeforeWordMode=pullAll;
 async function pullDriveHierarchy(onProgress){let result=await pullDriveHierarchyBeforeWordMode(onProgress),settings=await idbGet('settings','drive')||{},endpoint=await driveBridgeEndpoint(),root=settings.folderUrl||'',token=settings.appsScriptToken||'',wordForms=0,wordApps=0;if(!endpoint||!root||!token)return result;let list=await jsonp(endpoint,{action:'driveList',token,folder:root},90000);if(!list.ok)return result;for(let item of list.items||[]){let meta=item.meta||{},needsWord=item.kind==='form'?!!(meta.hasWordTemplate||meta._driveWordName):applicationIsWord(meta);if(!needsWord)continue;let fetched=await jsonp(endpoint,{action:'driveItem',token,folder:root,kind:item.kind,formId:item.formId||meta.formId||'',itemKey:item.itemKey},90000),b64=fetched.wordBase64||(!/\.pdf$/i.test(fetched.fileName||'')?fetched.fileBase64:'');if(!fetched.ok||!b64)continue;if(item.kind==='form'){let local=await idbGet('forms',meta.id||item.itemKey);await idbPut('forms',{...(local||{}),...meta,id:meta.id||item.itemKey,wordBuffer:base64ToArrayBuffer(b64),wordOriginalName:fetched.wordName||fetched.fileName||meta._driveWordName||'',wordMime:fetched.wordMime||fetched.fileMime||wordMimeFromName(fetched.wordName||fetched.fileName),hasWordTemplate:true,driveFolderUrl:root});wordForms++}else{let id=meta.id||item.itemKey,local=await idbGet('apps',id);await idbPut('apps',{...(local||{}),...meta,id,submissionMode:'word',word:base64ToArrayBuffer(b64),wordName:fetched.fileName||meta._driveFileName||'',wordMime:fetched.fileMime||wordMimeFromName(fetched.fileName),driveSyncStatus:'Đã chuyển lên Drive'});wordApps++}}return{...result,restoredForms:Number(result.restoredForms||0)+wordForms,restoredApps:Number(result.restoredApps||0)+wordApps,restoredWordForms:wordForms,restoredWordApps:wordApps}};pullAll=pullDriveHierarchy;pullAllV4=pullDriveHierarchy;
@@ -3347,6 +3353,9 @@ viewApp=async function(id){
 
 /* Thêm nút Xóa cho từng thẻ hồ sơ trong danh sách */
 function injectRecordDeleteButtons(){
+ /* SF24: TẮT. Nút "Xóa" từng thẻ bị bản 18 gỡ đi ngay, bản 13 lại chèn lại → vòng lặp chèn/gỡ liên tục
+    làm bản 23 (thanh xóa + tự cập nhật Drive) không bao giờ được gắn. Xóa hồ sơ nay dùng "Mở chức năng xóa". */
+ return;
  document.querySelectorAll('#av-records .student-foot .actions').forEach(actions=>{
   if(actions.querySelector('[data-sf13-del]'))return;
   const view=[...actions.querySelectorAll('button')].find(b=>/viewApp\(/.test(b.getAttribute('onclick')||''));
@@ -3878,6 +3887,8 @@ function quietRefresh(){
 let syncing=false,lastSyncAt=0;
 async function backgroundSync(force){
  if(syncing)return;
+ if(!force&&window.sfAutoSyncPaused)return; /* SF24: đang tạm dừng cập nhật */
+ if(window.sfDriveLocks&&window.sfDriveLocks.known&&!window.sfDriveLocks.read)return; /* SF24: thiếu URL Đọc dữ liệu → tạm khóa */
  if(!force&&!adminIdle())return;
  if(!force&&Date.now()-lastSyncAt<CFG.ADMIN_POLL-2000)return;
  const cfg=await adminConfig();
@@ -4658,5 +4669,1581 @@ window.sf17Shorten=shortenLink;
 
 })();
 /* ===== Kết thúc SmartForms 17.0 ===== */
+
+/* ===== SmartForms 18.0 · tách mục thiết lập hệ thống + quản lý Drive & liên kết =====
+   - Gom cấu hình Gmail, Drive và các mã Apps Script vào một mục riêng.
+   - Giữ mục Drive cho link phụ huynh, link quản trị, link thư mục và đồng bộ.
+   - Ẩn nút Xóa trong khu vực quản lý hồ sơ theo yêu cầu.
+   - Rút gọn link bằng JSONP, có fetch dự phòng và lưu lại sau khi tạo thành công.
+*/
+(function installSmartForms18(){
+ 'use strict';
+ if(window.__sf18Installed)return;
+ window.__sf18Installed=true;
+
+ const ADMIN_VIEWS=['dashboard','forms','records','gmail','system','drive','settings'];
+ const UI_KEY='st_smartforms_ui_session_v1';
+ const rawShowAdminView=window.showAdminView;
+ const rawRenderAdminGate=window.renderAdminGate;
+ const rawRenderGmail=window.renderGmail;
+ const rawRenderRecords=window.renderRecords;
+ const rawViewApp=window.viewApp;
+
+ function q(selector,root=document){return root.querySelector(selector)}
+ function qa(selector,root=document){return[...root.querySelectorAll(selector)]}
+ function safeText(value){return String(value??'')}
+ function html(value){return typeof esc==='function'?esc(value):safeText(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+ function copyText(value){
+  return navigator.clipboard?.writeText(String(value||'')).then(()=>true).catch(()=>{
+   const area=document.createElement('textarea');area.value=String(value||'');area.style.cssText='position:fixed;left:-9999px;opacity:0';
+   document.body.appendChild(area);area.select();let ok=false;try{ok=document.execCommand('copy')}catch{}area.remove();return ok;
+  });
+ }
+ function readUi(){try{return JSON.parse(sessionStorage.getItem(UI_KEY)||'{}')}catch{return{}}}
+ function saveUi(patch){try{sessionStorage.setItem(UI_KEY,JSON.stringify({...readUi(),...patch}))}catch{}}
+ function currentDriveData(raw){
+  const d=raw||{};
+  return{
+   ...d,id:'drive',
+   appsScriptUrl:String(d.appsScriptUrl||d.endpoint||''),
+   appsScriptToken:String(d.appsScriptToken||d.token||''),
+   publicSiteUrl:String(d.publicSiteUrl||''),
+   folderUrl:String(d.folderUrl||Object.values(d.formFolders||{}).find(Boolean)||''),
+   formFolders:{...(d.formFolders||{})},
+   autoForms:d.autoForms!==false,
+   autoApps:d.autoApps!==false
+  };
+ }
+ async function getDriveData(){return currentDriveData(await idbGet('settings','drive')||{})}
+ function normalizeAppsScript(value){
+  const raw=safeText(value).trim().replace(/\/+$/,'');
+  if(!raw)return'';
+  try{const u=new URL(raw);return u.protocol==='https:'&&u.hostname==='script.google.com'&&/^\/macros\/s\/[-\w]+\/exec$/i.test(u.pathname)?u.toString():''}catch{return''}
+ }
+ function normalizeSite(value){
+  const raw=safeText(value).trim();if(!raw)return'';
+  try{const u=new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(raw)?raw:'https://'+raw);if(!['http:','https:'].includes(u.protocol))return'';u.hash='';u.search='';return u.toString().replace(/\/$/,'/')}catch{return''}
+ }
+ function normalizeFolder(value){
+  const raw=safeText(value).trim();if(!raw)return'';
+  const match=raw.match(/\/folders\/([-\w]{15,})/i)||raw.match(/[?&]id=([-\w]{15,})/i)||raw.match(/^([-\w]{15,})$/);
+  if(!match)throw new Error('Link thư mục Google Drive chưa đúng. Hãy sao chép toàn bộ link có /folders/.');
+  const key=raw.match(/[?&]resourcekey=([^&#]+)/i)?.[1]||'';
+  return`https://drive.google.com/drive/folders/${match[1]}${key?'?resourcekey='+encodeURIComponent(key):''}`;
+ }
+ function compactDeploymentId(endpoint){return safeText(endpoint).match(/\/s\/([-\w]+)\/exec/i)?.[1]||''}
+ function portalLink(endpoint,site,view){
+  const normalizedEndpoint=normalizeAppsScript(endpoint),base=normalizeSite(site)||(/^https?:$/.test(location.protocol)?location.href:'');
+  if(!normalizedEndpoint||!base)return'';
+  try{
+   const u=new URL(base);u.search='';u.hash='';u.searchParams.set('view',view);
+   const id=compactDeploymentId(normalizedEndpoint);
+   if(id)u.searchParams.set('sf',id);else u.searchParams.set('sf_service',normalizedEndpoint);
+   return u.toString();
+  }catch{return''}
+ }
+ function readGmailCode(){return String(window.GMAIL_BRIDGE_CODE||'')}
+ function readDriveCode(){return String(window.DRIVE_HIERARCHY_APPS_SCRIPT||'')}
+ function setStatus(id,message,kind=''){
+  const box=q('#'+id);if(!box)return;box.className='notice'+(kind?' '+kind:'');box.innerHTML=message;
+ }
+ function hideAllPanes(){
+  for(const name of ADMIN_VIEWS){const pane=q('#av-'+name);if(pane)pane.classList.toggle('hidden',name!=='__never__')}
+ }
+ function markActive(view){
+  qa('#page-admin .sidebtn[data-av]').forEach(button=>button.classList.toggle('active',button.dataset.av===view));
+ }
+
+ function installStyles(){
+  if(q('#sf18Style'))return;
+  const style=document.createElement('style');style.id='sf18Style';style.textContent=`
+   #page-admin .adminlayout{grid-template-columns:minmax(285px,315px) minmax(0,1fr);align-items:start}
+   #page-admin .sidebar{min-width:0}
+   .sf18-nav-group{margin:6px 0 14px;padding:0 4px}
+   .sf18-nav-label{padding:8px 11px 5px;color:rgba(255,255,255,.55);font-size:10px;font-weight:900;letter-spacing:.12em;text-transform:uppercase}
+   .sf18-nav-group .sidebtn{white-space:normal;line-height:1.35;overflow-wrap:anywhere}
+   .sf18-setup-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
+   .sf18-setup-card{min-width:0}
+   .sf18-card-head{display:flex;gap:12px;align-items:flex-start;margin-bottom:15px}
+   .sf18-card-number{width:36px;height:36px;flex:0 0 auto;display:grid;place-items:center;border-radius:11px;background:#e7f1f5;color:#0d5e78;font-weight:950}
+   .sf18-card-head h3{margin:1px 0 3px;color:#123f59;font-size:1.08rem}
+   .sf18-card-head p{margin:0;color:#6b7c8c;font-size:.86rem;line-height:1.5}
+   .sf18-code{margin-top:14px}
+   .sf18-code summary{cursor:pointer;font-weight:850;color:#24586d}
+   .sf18-code textarea{width:100%;min-height:280px;margin-top:10px;font:11px/1.45 Consolas,Monaco,monospace;resize:vertical}
+   .sf18-processes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+   .sf18-process{padding:14px;border:1px solid #d8e6eb;border-radius:13px;background:#f8fbfc}
+   .sf18-process b{display:block;color:#164b62;margin-bottom:5px}
+   .sf18-process span{color:#687b89;font-size:12px;line-height:1.5}
+   .sf18-link-card{padding:16px;border:1px solid var(--line);border-radius:15px;background:#fff}
+   .sf18-link-card+.sf18-link-card{margin-top:12px}
+   .sf18-link-card h3{margin:0 0 7px;font-size:1rem;color:#164b62}
+   .sf18-link-card p{margin:0;color:#6b7b8d;font-size:12px;line-height:1.55}
+   .sf18-link-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:9px}
+   .sf18-link-row input{flex:1;min-width:230px}
+   .sf18-form-list{display:grid;gap:8px;margin-top:10px}
+   .sf18-form-item{display:flex;gap:10px;align-items:flex-start;justify-content:space-between;padding:12px 13px;border:1px solid #e0e8ed;border-radius:12px;background:#fbfdfe;min-width:0}
+   .sf18-form-item>div{min-width:0}
+   .sf18-form-item b{display:block;overflow-wrap:anywhere;word-break:break-word;line-height:1.45}
+   .sf18-form-item small{display:block;margin-top:4px;color:#6a7b8b;line-height:1.45}
+   .sf18-short{margin-top:14px;padding:16px;border:1px solid #c8dce7;border-radius:15px;background:linear-gradient(145deg,#f6fbfd,#f6fbfa)}
+   .sf18-short h3{margin:0 0 6px;color:#12566b;font-size:1rem}
+   .sf18-short p{margin:0;color:#637888;font-size:12px;line-height:1.55}
+   .sf18-short-link{font-weight:900;color:#0d5365;word-break:break-all;font-size:1.03rem;margin-top:10px}
+   .sf18-short-msg{margin-top:10px;font-size:12.5px;line-height:1.65}
+   .sf18-short .sf18-alias{margin-top:12px}
+   .sf18-drive-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:14px}
+   .sf18-drive-stat{padding:12px;border-radius:12px;background:#f7fafc;border:1px solid #dfe9ee}
+   .sf18-drive-stat b{display:block;font-size:1.2rem;color:#174c62}
+   .sf18-drive-stat span{display:block;color:#6d7d8a;font-size:11px;margin-top:3px}
+   #av-records .record-parent>summary>div{min-width:0;flex:1}
+   #av-records .record-parent>summary b,#av-records .student-main b,#av-records .student-main small{white-space:normal;overflow-wrap:anywhere;word-break:break-word}
+   #av-records .student-card-head{grid-template-columns:auto minmax(0,1fr) minmax(0,auto)}
+   #av-records .student-code{max-width:18ch;white-space:normal;overflow-wrap:anywhere;text-align:right}
+   #av-records .student-foot{min-width:0;flex-wrap:wrap}
+   #av-records .student-foot .actions{min-width:0;flex-wrap:wrap}
+   @media(max-width:950px){#page-admin .adminlayout{grid-template-columns:1fr}}
+   @media(max-width:760px){.sf18-setup-grid,.sf18-processes,.sf18-drive-summary{grid-template-columns:1fr}.sf18-link-row input{min-width:100%}.sf18-form-item{display:block}.sf18-form-item .badge{margin-top:8px}}
+  `;document.head.appendChild(style);
+ }
+
+ function installNav(){
+  const sidebar=q('#page-admin .sidebar'),layout=sidebar?.parentElement;
+  if(!sidebar||!layout)return;
+  installStyles();
+  if(!q('#av-system',layout)){
+   const pane=document.createElement('div');pane.id='av-system';pane.className='hidden';(q('#av-dashboard')?.parentElement||layout).appendChild(pane);
+  }
+  if(sidebar.dataset.sf18Nav==='1')return;
+  sidebar.dataset.sf18Nav='1';
+  sidebar.innerHTML=`
+   <div class="sf18-nav-group"><div class="sf18-nav-label">Vận hành</div>
+    <button class="sidebtn active" data-av="dashboard" type="button">Tổng quan</button>
+    <button class="sidebtn" data-av="forms" type="button">Biểu mẫu</button>
+    <button class="sidebtn" data-av="records" type="button">Quản lý hồ sơ</button>
+   </div>
+   <div class="sf18-nav-group"><div class="sf18-nav-label">Dịch vụ hệ thống</div>
+    <button class="sidebtn" data-av="gmail" type="button">Gửi email</button>
+    <button class="sidebtn" data-av="system" type="button">Thiết lập hệ thống</button>
+    <button class="sidebtn" data-av="drive" type="button">Quản lý Drive &amp; liên kết</button>
+   </div>
+   <div class="sf18-nav-group"><div class="sf18-nav-label">Tài khoản</div>
+    <button class="sidebtn" data-av="settings" type="button">Tài khoản quản trị</button>
+    <button class="sidebtn" data-sf18-logout type="button">Đăng xuất</button>
+   </div>`;
+  qa('[data-av]',sidebar).forEach(button=>button.onclick=()=>sf18ShowAdminView(button.dataset.av));
+  q('[data-sf18-logout]',sidebar).onclick=()=>window.logoutAdmin?.();
+ }
+
+ function removeRecordDeleteButtons(root=document){
+  const scopes=[];
+  const records=q('#av-records',root)||q('#av-records');if(records)scopes.push(records);
+  const modal=q('#modalBody',root)||q('#modalBody');if(modal)scopes.push(modal);
+  for(const scope of scopes){
+   qa('button,a',scope).forEach(button=>{
+    const text=safeText(button.textContent).trim();
+    if(button.closest('[data-sf23-keep]'))return;
+    if(/^(xóa|xoá)(\s|$)/i.test(text)||/^(xóa|xoá) hồ sơ/i.test(text)||/xóa hồ sơ.*drive/i.test(text))button.remove();
+   });
+  }
+ }
+
+ async function renderSystemSetup(){
+  const pane=q('#av-system');if(!pane)return;
+  const g=await idbGet('settings','gmail')||{id:'gmail'};
+  const d=await getDriveData();
+  const gmailCode=readGmailCode(),driveCode=readDriveCode();
+  pane.innerHTML=`
+   <div class="sectionHead"><div><h2>Thiết lập hệ thống</h2><p>Cấu hình dịch vụ và mã Apps Script được gom tại đây. Mỗi nhóm xử lý có khu vực riêng để dễ kiểm tra, thay mã và bàn giao.</p></div></div>
+   <div class="card panel" style="margin-bottom:16px"><div class="sf18-processes">
+    <div class="sf18-process"><b>01 · Gmail</b><span>Kết nối tài khoản gửi thư, kiểm tra quyền và tạo lịch gửi.</span></div>
+    <div class="sf18-process"><b>02 · Google Drive</b><span>Kết nối thư mục mẹ, đồng bộ biểu mẫu và hồ sơ.</span></div>
+    <div class="sf18-process"><b>03 · Liên kết</b><span>Tạo link phụ huynh, link quản trị và link rút gọn ở mục riêng.</span></div>
+   </div></div>
+   <div class="sf18-setup-grid">
+    <section class="card panel sf18-setup-card"><div class="sf18-card-head"><div class="sf18-card-number">1</div><div><h3>Thiết lập Gmail</h3><p>URL và token Gmail chỉ dùng cho chức năng gửi thư; không nhập lẫn token Drive.</p></div></div>
+     <form id="sf18GmailForm" class="formgrid"><div class="field full"><label>Gmail người gửi</label><input name="senderEmail" type="email" value="${html(g.senderEmail||'')}" placeholder="truonghoc@gmail.com" required></div><div class="field full"><label>URL Web App Gmail</label><input name="endpoint" value="${html(g.endpoint||'')}" placeholder="https://script.google.com/macros/s/.../exec" required></div><div class="field full"><label>SMARTFORMS_GMAIL_TOKEN</label><input name="token" type="password" value="${html(g.token||'')}" autocomplete="off" required></div><div class="field full"><button class="btn primary" type="submit">Lưu &amp; kiểm tra Gmail</button></div></form>
+     <div id="sf18GmailProgress" style="margin-top:12px"></div>
+     <details class="sf18-code"><summary>Mã Apps Script Gmail / lịch gửi</summary><div class="setup-guide" style="margin-top:10px">Dán mã vào Apps Script riêng của Gmail, chạy hàm cấp quyền một lần rồi Deploy Web App với quyền thực thi phù hợp. Sau đó dán URL và token vào biểu mẫu phía trên.</div><textarea id="sf18GmailCode" readonly spellcheck="false">${html(gmailCode)}</textarea><button class="btn secondary" type="button" id="sf18CopyGmailCode">Sao chép mã Gmail</button></details>
+    </section>
+    <section class="card panel sf18-setup-card"><div class="sf18-card-head"><div class="sf18-card-number">2</div><div><h3>Thiết lập Google Drive</h3><p>URL Apps Script Drive, mã kết nối, website chính thức và thư mục mẹ được lưu cùng một cấu hình.</p></div></div>
+     <form id="sf18DriveForm" class="formgrid"><div class="field full"><label>Website chính thức của nhà trường</label><input name="publicSiteUrl" value="${html(d.publicSiteUrl)}" placeholder="https://ten-truong.github.io/ten-du-an/"></div><div class="field full"><label>URL Web App Apps Script Drive</label><input name="appsScriptUrl" value="${html(d.appsScriptUrl)}" placeholder="https://script.google.com/macros/s/.../exec" required></div><div class="field full"><label>SMARTFORMS_DRIVE_TOKEN</label><input name="appsScriptToken" type="password" value="${html(d.appsScriptToken)}" autocomplete="off" required></div><div class="field full"><label>Thư mục mẹ Google Drive</label><input name="folderUrl" value="${html(d.folderUrl)}" placeholder="https://drive.google.com/drive/folders/..." required></div><div class="field"><label style="display:flex;gap:8px;align-items:center"><input name="autoForms" type="checkbox" style="width:auto" ${d.autoForms?'checked':''}> Tự đồng bộ biểu mẫu</label></div><div class="field"><label style="display:flex;gap:8px;align-items:center"><input name="autoApps" type="checkbox" style="width:auto" ${d.autoApps?'checked':''}> Tự đồng bộ hồ sơ</label></div><div class="field full"><button class="btn primary" type="submit">Lưu cấu hình Drive</button></div></form>
+     <div class="actions" style="margin-top:12px"><button class="btn secondary" type="button" id="sf18DriveTest">Kiểm tra Drive</button><button class="btn secondary" type="button" id="sf18DriveSync">Đồng bộ</button><button class="btn ghost" type="button" id="sf18DrivePull">Lấy dữ liệu về</button></div><div id="sf18DriveProgress" style="margin-top:12px"></div>
+     <details class="sf18-code"><summary>Mã Apps Script Drive / đồng bộ hồ sơ</summary><div class="setup-guide" style="margin-top:10px">Mã Drive xử lý các nhóm: kết nối thư mục, đăng ký biểu mẫu, ghi hồ sơ, lấy dữ liệu mới và xác nhận trạng thái. Hãy cập nhật toàn bộ mã khi đổi phiên bản.</div><textarea id="sf18DriveCode" readonly spellcheck="false">${html(driveCode)}</textarea><button class="btn secondary" type="button" id="sf18CopyDriveCode">Sao chép mã Drive</button></details>
+    </section>
+   </div>`;
+
+  q('#sf18CopyGmailCode')?.addEventListener('click',async e=>{e.currentTarget.textContent=await copyText(gmailCode)?'Đã sao chép':'Không sao chép được';setTimeout(()=>{if(e.currentTarget.isConnected)e.currentTarget.textContent='Sao chép mã Gmail'},1700)});
+  q('#sf18CopyDriveCode')?.addEventListener('click',async e=>{e.currentTarget.textContent=await copyText(driveCode)?'Đã sao chép':'Không sao chép được';setTimeout(()=>{if(e.currentTarget.isConnected)e.currentTarget.textContent='Sao chép mã Drive'},1700)});
+  q('#sf18GmailForm')?.addEventListener('submit',async event=>{
+   event.preventDefault();const form=event.currentTarget,button=event.submitter||q('button',form),data=Object.fromEntries(new FormData(form).entries());button.disabled=true;button.textContent='Đang kiểm tra…';setStatus('sf18GmailProgress','Đang lưu cấu hình Gmail…');
+   try{
+    const next={...g,id:'gmail',senderEmail:safeText(data.senderEmail).trim(),endpoint:safeText(data.endpoint).trim().replace(/\/+$/,''),token:safeText(data.token).trim()};
+    if(!normalizeAppsScript(next.endpoint))throw new Error('URL Web App Gmail chưa đúng. URL phải kết thúc bằng /exec.');
+    await idbPut('settings',next);
+    const checker=window.checkGmailConnection;
+    if(typeof checker==='function')await checker(next.senderEmail);
+    setStatus('sf18GmailProgress','<b>Đã lưu cấu hình Gmail.</b> Có thể chuyển sang mục Gửi email để tạo thư.','ok');
+   }catch(error){setStatus('sf18GmailProgress',html(error?.message||error),'bad')}
+   finally{button.disabled=false;button.textContent='Lưu & kiểm tra Gmail'}
+  });
+  q('#sf18DriveForm')?.addEventListener('submit',async event=>{
+   event.preventDefault();const form=event.currentTarget,button=event.submitter||q('button',form),data=Object.fromEntries(new FormData(form).entries());button.disabled=true;button.textContent='Đang lưu…';setStatus('sf18DriveProgress','Đang lưu cấu hình Drive…');
+   try{
+    const endpoint=normalizeAppsScript(data.appsScriptUrl),folder=normalizeFolder(data.folderUrl),site=normalizeSite(data.publicSiteUrl);
+    if(!endpoint)throw new Error('URL Web App Drive chưa đúng. URL phải kết thúc bằng /exec.');
+    if(!safeText(data.appsScriptToken).trim())throw new Error('Chưa nhập SMARTFORMS_DRIVE_TOKEN.');
+    const next={...d,id:'drive',appsScriptUrl:endpoint,appsScriptToken:safeText(data.appsScriptToken).trim(),publicSiteUrl:site,folderUrl:folder,autoForms:data.autoForms==='on',autoApps:data.autoApps==='on',formFolders:{...(d.formFolders||{})}};
+    await idbPut('settings',next);
+    const forms=await idbAll('forms');for(const formItem of forms){formItem.driveFolderUrl=folder;await idbPut('forms',formItem)}
+    setStatus('sf18DriveProgress','<b>Đã lưu cấu hình Drive.</b> Bây giờ có thể kiểm tra quyền ghi hoặc mở mục “Quản lý Drive & liên kết”.','ok');
+   }catch(error){setStatus('sf18DriveProgress',html(error?.message||error),'bad')}
+   finally{button.disabled=false;button.textContent='Lưu cấu hình Drive'}
+  });
+  q('#sf18DriveTest')?.addEventListener('click',async event=>{
+   const button=event.currentTarget;button.disabled=true;button.textContent='Đang kiểm tra…';setStatus('sf18DriveProgress','Đang kiểm tra quyền ghi vào thư mục mẹ…');
+   try{const dNow=await getDriveData(),check=window.checkDriveConnection||window.driveHierarchyHealth;if(typeof check!=='function')throw new Error('Chưa tải được hàm kiểm tra Drive. Hãy tải lại trang rồi thử lại.');const result=await check(dNow.folderUrl,{force:true});setStatus('sf18DriveProgress',`<b>Drive đã kết nối.</b>${result?.folderName?` Thư mục: <b>${html(result.folderName)}</b>.`:''}`,'ok')}catch(error){setStatus('sf18DriveProgress',html(error?.message||error),'bad')}finally{button.disabled=false;button.textContent='Kiểm tra Drive'}
+  });
+  q('#sf18DriveSync')?.addEventListener('click',async event=>{
+   const button=event.currentTarget;button.disabled=true;button.textContent='Đang đồng bộ…';setStatus('sf18DriveProgress','Đang đồng bộ từng nhóm dữ liệu…');
+   try{const sync=window.syncAllDriveHierarchy||window.syncAll||window.syncAllV4;if(typeof sync!=='function')throw new Error('Chưa tải được hàm đồng bộ Drive.');await sync();setStatus('sf18DriveProgress','Đã gửi yêu cầu đồng bộ. Kiểm tra lại trong mục “Quản lý Drive & liên kết”.','ok')}catch(error){setStatus('sf18DriveProgress',html(error?.message||error),'bad')}finally{button.disabled=false;button.textContent='Đồng bộ'}
+  });
+  q('#sf18DrivePull')?.addEventListener('click',async event=>{
+   const button=event.currentTarget;button.disabled=true;button.textContent='Đang lấy…';setStatus('sf18DriveProgress','Đang lấy dữ liệu mới nhất từ Drive…');
+   try{const pull=window.pullDriveHierarchy||window.pullAll||window.pullAllV4;if(typeof pull!=='function')throw new Error('Chưa tải được hàm lấy dữ liệu Drive.');const result=await pull();setStatus('sf18DriveProgress',`Đã lấy dữ liệu mới nhất từ Drive${result?.restoredApps!==undefined?`: ${html(result.restoredApps)} hồ sơ, ${html(result.restoredForms)} biểu mẫu`:''}.`,'ok')}catch(error){setStatus('sf18DriveProgress',html(error?.message||error),'bad')}finally{button.disabled=false;button.textContent='Lấy dữ liệu về'}
+  });
+ }
+
+ async function renderDriveLinks(){
+  const pane=q('#av-drive');if(!pane)return;
+  const d=await getDriveData(),forms=await idbAll('forms'),apps=await idbAll('apps'),endpoint=normalizeAppsScript(d.appsScriptUrl),site=normalizeSite(d.publicSiteUrl)||(/\.github\.io$/i.test(location.hostname)?normalizeSite(location.href):''),parent=portalLink(endpoint,site,'parent'),admin=portalLink(endpoint,site,'admin'),saved=String(d.parentShortLink||''),savedSource=String(d.parentShortSource||''),stale=!!saved&&!!savedSource&&savedSource!==parent;
+  const folderLink=d.folderUrl||'';
+  pane.innerHTML=`
+   <div class="sectionHead"><div><h2>Quản lý Drive &amp; liên kết</h2><p>Quản lý các link sử dụng và thao tác đồng bộ. Cấu hình Gmail/Drive nằm trong mục “Thiết lập hệ thống”.</p></div></div>
+   <div class="card panel"><div class="notice ${endpoint&&site&&folderLink?'ok':'warn'}">${endpoint&&site&&folderLink?'<b>Đã có đủ dữ liệu để tạo liên kết.</b>':'Hãy hoàn tất URL Apps Script, website chính thức và thư mục mẹ trong mục “Thiết lập hệ thống”.'}</div>
+    <div class="sf18-drive-summary"><div class="sf18-drive-stat"><b>${forms.length}</b><span>Loại biểu mẫu</span></div><div class="sf18-drive-stat"><b>${apps.length}</b><span>Hồ sơ trên máy</span></div><div class="sf18-drive-stat"><b>${forms.filter(x=>x.published).length}</b><span>Biểu mẫu công khai</span></div></div>
+    <div class="sf18-link-card" style="margin-top:16px"><h3>Thư mục mẹ Google Drive</h3><p>Đây là nơi Apps Script tạo các mục con theo từng loại biểu mẫu và mã hồ sơ.</p><div class="sf18-link-row"><input readonly value="${html(folderLink)}" placeholder="Chưa có link thư mục Drive"><button class="btn secondary" type="button" data-sf18-copy-value="${html(folderLink)}" ${folderLink?'':'disabled'}>Sao chép</button>${folderLink?`<a class="btn ghost btn-link" href="${html(folderLink)}" target="_blank" rel="noopener">Mở Drive ↗</a>`:''}</div></div>
+    <div class="sf18-link-card"><h3>Liên kết dành cho phụ huynh</h3><p>Chỉ gửi link này cho phụ huynh để xem biểu mẫu công khai và tra cứu hồ sơ.</p><div class="sf18-link-row"><input id="sf18ParentLink" readonly value="${html(parent)}" placeholder="Chưa tạo được link phụ huynh"><button class="btn secondary" type="button" data-sf18-copy-target="sf18ParentLink" ${parent?'':'disabled'}>Sao chép</button>${parent?`<a class="btn ghost btn-link" href="${html(parent)}" target="_blank" rel="noopener">Mở thử ↗</a>`:''}</div></div>
+    <div class="sf18-link-card"><h3>Liên kết quản trị</h3><p>Mở trên máy khác để đăng nhập và làm việc với cùng dữ liệu của nhà trường.</p><div class="sf18-link-row"><input id="sf18AdminLink" readonly value="${html(admin)}" placeholder="Chưa tạo được link quản trị"><button class="btn secondary" type="button" data-sf18-copy-target="sf18AdminLink" ${admin?'':'disabled'}>Sao chép</button>${admin?`<a class="btn ghost btn-link" href="${html(admin)}" target="_blank" rel="noopener">Mở thử ↗</a>`:''}</div></div>
+    <div class="sf18-short"><h3>Link rút gọn gửi phụ huynh</h3><p>Tạo từ link phụ huynh ở trên. Link sau khi tạo sẽ được lưu lại và không tự đổi.</p>${stale?`<div class="notice warn" style="margin-top:10px">Link rút gọn hiện tại đang trỏ tới link phụ huynh cũ. Hãy tạo lại link mới.</div>`:''}<div id="sf18ShortBody"></div></div>
+    <div class="sf18-link-card"><h3>Phân loại biểu mẫu trên Drive</h3><p>Tên dài vẫn hiển thị đầy đủ; mỗi loại biểu mẫu được dùng làm một nhóm dữ liệu riêng.</p><div class="sf18-form-list">${forms.length?forms.map(form=>`<div class="sf18-form-item"><div><b>${html(form.title||'Biểu mẫu chưa đặt tên')}</b><small>${form.published?'Đang công khai':'Đang tạm ẩn'} · ${html(form.sections?.length||1)} phần · dữ liệu lưu trong thư mục mẹ đã cấu hình.</small></div><span class="badge ${form.published?'ok':''}">${form.published?'Đang dùng':'Tạm ẩn'}</span></div>`).join(''):'<div class="notice">Chưa có biểu mẫu.</div>'}</div></div>
+    <div class="actions" style="margin-top:16px"><button class="btn secondary" type="button" id="sf18LinkSync">Đồng bộ dữ liệu</button><button class="btn secondary" type="button" id="sf18LinkPull">Lấy dữ liệu mới từ Drive</button><button class="btn ghost" type="button" id="sf18RefreshLinks">Làm mới liên kết</button></div><div id="sf18LinkProgress" style="margin-top:12px"></div>
+   </div>`;
+  bindLinkButtons();
+  drawShortPanel({parent,saved,savedSource,stale});
+  q('#sf18RefreshLinks')?.addEventListener('click',()=>renderDriveLinks());
+  q('#sf18LinkSync')?.addEventListener('click',async event=>{const button=event.currentTarget;button.disabled=true;button.textContent='Đang đồng bộ…';setStatus('sf18LinkProgress','Đang đồng bộ dữ liệu…');try{const fn=window.syncAllDriveHierarchy||window.syncAll||window.syncAllV4;if(typeof fn!=='function')throw new Error('Chưa tải được hàm đồng bộ Drive.');await fn();setStatus('sf18LinkProgress','Đã gửi yêu cầu đồng bộ dữ liệu.','ok')}catch(error){setStatus('sf18LinkProgress',html(error?.message||error),'bad')}finally{button.disabled=false;button.textContent='Đồng bộ dữ liệu'}});
+  q('#sf18LinkPull')?.addEventListener('click',async event=>{const button=event.currentTarget;button.disabled=true;button.textContent='Đang lấy…';setStatus('sf18LinkProgress','Đang lấy dữ liệu mới từ Drive…');try{const fn=window.pullDriveHierarchy||window.pullAll||window.pullAllV4;if(typeof fn!=='function')throw new Error('Chưa tải được hàm lấy dữ liệu Drive.');await fn();setStatus('sf18LinkProgress','Đã cập nhật dữ liệu mới nhất từ Drive.','ok');await renderDriveLinks()}catch(error){setStatus('sf18LinkProgress',html(error?.message||error),'bad')}finally{button.disabled=false;button.textContent='Lấy dữ liệu mới từ Drive'}});
+ }
+ function bindLinkButtons(){
+  qa('[data-sf18-copy-target]').forEach(button=>button.onclick=async()=>{const input=q('#'+button.dataset.sf18CopyTarget);if(!input?.value)return;button.textContent=await copyText(input.value)?'Đã sao chép':'Không sao chép được';setTimeout(()=>{if(button.isConnected)button.textContent='Sao chép'},1600)});
+  qa('[data-sf18-copy-value]').forEach(button=>button.onclick=async()=>{const value=button.dataset.sf18CopyValue||'';button.textContent=await copyText(value)?'Đã sao chép':'Không sao chép được';setTimeout(()=>{if(button.isConnected)button.textContent='Sao chép'},1600)});
+ }
+ async function saveShortData(patch){const current=await getDriveData();const next={...current,...patch,id:'drive'};await idbPut('settings',next);return next}
+ function cleanAlias(value){return safeText(value).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').replace(/Đ/g,'D').toLowerCase().replace(/[^a-z0-9_]/g,'').slice(0,30)}
+ function jsonpShort(url,timeout=16000){
+  return new Promise((resolve,reject)=>{
+   const name='__sf18cb'+Date.now().toString(36)+Math.random().toString(36).slice(2,8),script=document.createElement('script');let finished=false;
+   const finish=(error,data)=>{if(finished)return;finished=true;clearTimeout(timer);try{delete window[name]}catch{window[name]=undefined}script.remove();error?reject(error):resolve(data)};
+   const timer=setTimeout(()=>finish(new Error('Dịch vụ rút gọn không phản hồi.')),timeout);
+   window[name]=data=>finish(null,data);script.onerror=()=>finish(new Error('Không tải được dịch vụ rút gọn.'));script.src=url+(url.includes('?')?'&':'?')+'callback='+encodeURIComponent(name);document.head.appendChild(script);
+  });
+ }
+ async function requestShort(service,longUrl,alias){
+  const params=new URLSearchParams({format:'json',url:longUrl});if(alias)params.set('shorturl',alias);const url=service+'?'+params.toString();let data;
+  try{data=await jsonpShort(url)}catch(jsonpError){
+   try{const response=await fetch(url,{mode:'cors',cache:'no-store'});data=await response.json()}catch(fetchError){throw new Error(String(fetchError?.message||jsonpError?.message||'Không kết nối được dịch vụ rút gọn.'))}
+  }
+  if(data?.shorturl)return String(data.shorturl);
+  const code=Number(data?.errorcode||0),message=String(data?.errormessage||'');
+  if(code===2){const error=new Error(message||'Tên link đã được sử dụng.');error.code='TAKEN';throw error}
+  if(code===3){const error=new Error('Dịch vụ đang giới hạn số lần tạo link. Hãy thử lại sau khoảng một phút.');error.code='RATE';throw error}
+  if(code===1)throw new Error('Link phụ huynh gốc không hợp lệ hoặc chưa được công khai.');
+  throw new Error(message||'Dịch vụ không trả về link rút gọn.');
+ }
+ async function shorten(longUrl,alias){
+  if(!/^https?:\/\//i.test(longUrl))throw new Error('Link phụ huynh phải bắt đầu bằng http:// hoặc https://.');
+  let last='';for(const service of ['https://is.gd/create.php','https://v.gd/create.php']){try{return{short:await requestShort(service,longUrl,alias),service:service.includes('is.gd')?'is.gd':'v.gd'}}catch(error){if(error.code==='TAKEN')throw error;last=String(error?.message||error)}}throw new Error(last||'Chưa tạo được link rút gọn.');
+ }
+ async function drawShortPanel(data){
+  const body=q('#sf18ShortBody');if(!body)return;const parent=safeText(data.parent||''),saved=safeText(data.saved||''),stale=!!data.stale;
+  if(saved&&!stale){body.innerHTML=`<div class="sf18-short-link">${html(saved)}</div><div class="sf18-link-row"><button class="btn primary" type="button" id="sf18ShortCopy">Sao chép link</button><a class="btn secondary btn-link" href="${html(saved)}" target="_blank" rel="noopener">Mở thử ↗</a><button class="btn ghost" type="button" id="sf18ShortNew">Tạo link khác</button></div><div class="sf18-short-msg" id="sf18ShortMsg">Link này đang được lưu cố định trong hệ thống.</div>`;
+   q('#sf18ShortCopy').onclick=async()=>{const b=q('#sf18ShortCopy');b.textContent=await copyText(saved)?'Đã sao chép':'Không sao chép được';setTimeout(()=>{if(b.isConnected)b.textContent='Sao chép link'},1600)};
+   q('#sf18ShortNew').onclick=async()=>{if(!confirm('Tạo một link rút gọn khác? Link cũ vẫn tiếp tục hoạt động.'))return;await saveShortData({parentShortLink:'',parentShortName:'',parentShortSource:''});await drawShortPanel({parent,saved:'',savedSource:'',stale:false})};return;
+  }
+  body.innerHTML=`${stale?'<div class="notice warn" style="margin-top:10px">Link đã lưu đang trỏ tới link phụ huynh cũ.</div>':''}<div class="sf18-link-row sf18-alias"><input id="sf18Alias" maxlength="30" placeholder="Tên link, ví dụ: hosotruongabc"><button class="btn primary" type="button" id="sf18ShortMake" ${parent?'':'disabled'}>Tạo link rút gọn</button></div><div class="field-hint">Tên link gồm chữ thường, số hoặc dấu gạch dưới, dài 5–30 ký tự. Để trống để hệ thống tự sinh.</div><div class="sf18-short-msg" id="sf18ShortMsg">${parent?'':'Hãy hoàn tất Thiết lập hệ thống trước để tạo link phụ huynh.'}</div>`;
+  q('#sf18ShortMake')?.addEventListener('click',async event=>{const button=event.currentTarget,msg=q('#sf18ShortMsg'),aliasInput=q('#sf18Alias');let alias=cleanAlias(aliasInput.value);if(aliasInput.value.trim()&&alias.length<5){msg.innerHTML='<span style="color:var(--bad)">Tên link phải có ít nhất 5 ký tự.</span>';return}button.disabled=true;button.textContent='Đang tạo…';msg.textContent='Đang gửi yêu cầu tới is.gd/v.gd…';try{const result=await shorten(parent,alias);await saveShortData({parentShortLink:result.short,parentShortName:alias,parentShortSource:parent,parentShortAt:new Date().toISOString()});await drawShortPanel({parent,saved:result.short,savedSource:parent,stale:false})}catch(error){if(error.code==='TAKEN'){const suggestion=(alias||'smartforms')+Math.floor(Math.random()*90+10);aliasInput.value=suggestion;msg.innerHTML='<span style="color:var(--bad)">Tên link đã được sử dụng.</span> Hệ thống đã gợi ý tên mới, bấm tạo lại.'}else msg.innerHTML='<span style="color:var(--bad)">'+html(error?.message||error)+'</span>'}finally{if(button.isConnected){button.disabled=!parent;button.textContent='Tạo link rút gọn'}}});
+ }
+
+ function sf18ShowAdminView(view){
+  const safe=ADMIN_VIEWS.includes(view)?view:'dashboard';installNav();saveUi({adminView:safe});markActive(safe);hideAllPanes();
+  const pane=q('#av-'+safe);if(pane)pane.classList.remove('hidden');
+  if(safe==='system')return (window.sf20RenderSystem||renderSystemSetup)();
+  if(safe==='drive')return renderDriveLinks();
+  if(typeof rawShowAdminView==='function'){
+   const result=rawShowAdminView(safe);setTimeout(()=>{installNav();removeRecordDeleteButtons();if(safe==='gmail')cleanGmailSetup()},0);return result;
+  }
+ }
+ function cleanGmailSetup(){
+  const pane=q('#av-gmail');if(!pane)return;
+  qa('#gmailCfg,#gasCode,#driveBridgeCfg,#driveBridgeCode',pane).forEach(node=>{const holder=node.closest('details')||node;if(holder!==pane)holder.style.display='none'});
+ }
+ window.showAdminView=sf18ShowAdminView;
+ window.renderSystemSetup=renderSystemSetup;
+ window.renderDriveLinks=renderDriveLinks;
+ window.sf18Shorten=shorten;
+ window.renderGmail=async function(...args){const result=typeof rawRenderGmail==='function'?await rawRenderGmail(...args):null;cleanGmailSetup();return result};
+ window.renderRecords=async function(...args){const result=typeof rawRenderRecords==='function'?await rawRenderRecords(...args):null;removeRecordDeleteButtons();return result};
+ if(typeof rawViewApp==='function')window.viewApp=async function(...args){const result=await rawViewApp(...args);removeRecordDeleteButtons();return result};
+ if(typeof rawRenderAdminGate==='function')window.renderAdminGate=async function(...args){const result=await rawRenderAdminGate(...args);installNav();removeRecordDeleteButtons();const ui=readUi();if(document.querySelector('#adminApp:not(.hidden)')&&['system','drive'].includes(ui.adminView))sf18ShowAdminView(ui.adminView);return result};
+
+ let sf18Queued=false;const observer=new MutationObserver(records=>{if(sf18Queued)return;let changed=false;for(const record of records){if(record.addedNodes.length){changed=true;break}}if(!changed)return;sf18Queued=true;requestAnimationFrame(()=>{sf18Queued=false;installNav();removeRecordDeleteButtons()})});
+ function boot(){installStyles();installNav();removeRecordDeleteButtons();observer.observe(document.body,{childList:true,subtree:true})}
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
+})();
+
+/* ===== SmartForms 19.0 · trình chỉnh sửa biểu mẫu hai cột =====
+   Cột trái là nội dung/trạng thái; cột phải là công cụ cấu hình.
+   Nhãn tiếng Việt, thứ tự và nguồn dữ liệu được tách khỏi mã kỹ thuật.
+*/
+(function installSmartForms19Editor(){
+ 'use strict';
+ if(window.__sf19EditorInstalled)return;
+ window.__sf19EditorInstalled=true;
+ const q=(selector,root=document)=>root.querySelector(selector);
+ const qa=(selector,root=document)=>[...root.querySelectorAll(selector)];
+ const text=value=>String(value??'');
+ const html=value=>typeof esc==='function'?esc(value):text(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const stamp=()=>typeof nowISO==='function'?nowISO():new Date().toISOString();
+ const identityList=typeof identitySchema!=='undefined'&&Array.isArray(identitySchema)?identitySchema:[];
+
+ function fieldSource(field){return text(field.source||'')+'|'+text(field.key||'')}
+ function findIdentityLabel(key){const hit=identityList.find(item=>item[0]===key);return hit?hit[1]:text(key)}
+ function sectionFor(form,field){return(form.sections||[]).find(section=>section.id===field.sectionId)}
+ function sourceLabel(form,field){
+  if(field.source==='identity')return'Biểu mẫu xác nhận · '+findIdentityLabel(field.key);
+  if(field.source==='system')return'Hệ thống · Ngày lập văn bản';
+  if(field.source==='ignore')return'Bỏ qua vùng này';
+  const ref=(form.fields||[]).find(item=>item.source==='custom'&&item.key===field.key)||field;
+  const section=sectionFor(form,ref);
+  return'Phụ lục · '+text(section?.navTitle||ref.sectionTitle||'Dữ liệu phụ lục')+' · '+text(ref.label||ref.key||'Trường dữ liệu');
+ }
+ function sourceOption(value,label,current){
+  return'<option value="'+html(value)+'"'+(value===current?' selected':'')+'>'+html(label)+'</option>';
+ }
+ function sourceOptions(form,field){
+  const current=fieldSource(field),canChange=field.sf19SourceEditable===true||field.source==='custom';
+  let output='<optgroup label="Biểu mẫu xác nhận">';
+  identityList.forEach(item=>{output+=sourceOption('identity|'+item[0],item[1],current)});
+  output+='</optgroup><optgroup label="Dữ liệu phụ lục">';
+  const seen=new Set();
+  (form.fields||[]).filter(item=>item.source==='custom'&&item.key).forEach(item=>{
+   if(seen.has(item.key))return;
+   seen.add(item.key);
+   output+=sourceOption('custom|'+item.key,sourceLabel(form,item),current);
+  });
+  if(field.source==='custom'&&field.key&&!seen.has(field.key))output+=sourceOption('custom|'+field.key,sourceLabel(form,field),current);
+  output+='</optgroup><optgroup label="Hệ thống">';
+  output+=sourceOption('system|systemDate','Hệ thống · Ngày lập văn bản',current);
+  output+='</optgroup>'+sourceOption('ignore|','Bỏ qua vùng này',current);
+  return'<select class="sf19-source" data-role="source"'+(canChange?'':' disabled')+'>'+output+'</select>';
+ }
+ function typeLabel(value){return({text:'Văn bản',date:'Ngày',tel:'Số điện thoại',email:'Email',number:'Số',textarea:'Văn bản dài',signature:'Ảnh chữ ký'})[value]||text(value||'Văn bản')}
+ function editorRows(form){
+  return(form.fields||[]).map((field,index)=>{
+   const label=text(field.label||'Trường dữ liệu'),section=sectionFor(form,field),locked=!(field.sf19SourceEditable===true||field.source==='custom');
+   return'<div class="sf19-field-row" draggable="true" data-sf19-original-index="'+index+'">'+
+    '<div class="sf19-order-tools"><span class="sf19-drag" title="Kéo để đổi vị trí">☷</span><b data-sf19-number>'+String(index+1)+'</b><button type="button" class="btn ghost sf19-mini" data-sf19-up title="Đưa lên">↑</button><button type="button" class="btn ghost sf19-mini" data-sf19-down title="Đưa xuống">↓</button></div>'+
+    '<div class="sf19-field-name"><label>Tên trường tiếng Việt</label><input data-role="label" value="'+html(label)+'" placeholder="Ví dụ: Họ và tên học sinh"'+(locked?' readonly':'')+'><small>'+html(locked?'Tên chuẩn của biểu mẫu xác nhận/hệ thống được giữ nguyên.':text(section?.navTitle||field.sectionTitle||'Không rõ phần')+' · '+text(field.key||'chưa có mã'))+'</small></div>'+
+    '<div class="sf19-field-source"><label>Lấy dữ liệu từ</label>'+sourceOptions(form,field)+(locked?'<small class="sf19-lock">Đang giữ loại '+html(field.source==='identity'?'xác nhận':field.source==='system'?'hệ thống':'bỏ qua')+'</small>':'<small class="sf19-hint">Tên hiển thị lấy đúng từ trường tiếng Việt của phụ lục.</small>')+'</div>'+
+    '<div class="sf19-field-meta"><span class="badge">'+html(typeLabel(field.type))+'</span><span class="sf19-confidence '+(Number(field.confidence||0)<.7?'low':'')+'">'+Math.round(Number(field.confidence||0)*100)+'% PDF</span><button type="button" class="btn ghost sf19-fine" data-sf19-fine>Vị trí/font</button></div>'+
+   '</div>';
+  }).join('');
+ }
+ function statusHtml(form){
+  const active=(form.fields||[]).filter(field=>field.source!=='ignore').length;
+  const published=form.published?'Đang công khai':'Đang tạm ẩn';
+  const version=text(form.recognizerVersion||'Chưa có phiên bản quét');
+  return'<div class="sf19-status-card"><div><span class="sf19-status-kicker">NỘI DUNG &amp; TRẠNG THÁI</span><h3>'+html(form.title||'Biểu mẫu')+'</h3><p>'+html(form.description||'Cấu hình nội dung PDF và dữ liệu điền tự động.')+'</p></div><div class="sf19-status-pills"><span class="badge '+(form.published?'ok':'')+'">'+published+'</span><span class="badge">'+(form.sections||[]).length+' phần/phụ lục</span><span class="badge">'+active+' trường đang dùng</span><span class="badge">'+html(version)+'</span></div></div>';
+ }
+ async function enhanceEditor(id,successMessage){
+  const body=q('#modalBody'),form=await idbGet('forms',id);
+  if(!body||!form||q('.sf19-editor-layout',body))return;
+  const oldNodes=[...body.childNodes],modalBox=q('#modal .modalbox');
+  modalBox?.classList.add('wide');
+  const shell=document.createElement('div');shell.className='sf19-editor-layout';
+  const left=document.createElement('section');left.className='sf19-editor-content';
+  left.innerHTML='<div class="sf19-column-heading"><span class="sf19-column-icon">▤</span><div><b>Nội dung &amp; trạng thái</b><small>Kiểm tra biểu mẫu PDF, các phần/phụ lục và trạng thái kết nối.</small></div></div>'+statusHtml(form)+(successMessage?'<div class="notice ok sf19-save-note">'+html(successMessage)+'</div>':'');
+  const oldBox=document.createElement('div');oldBox.className='sf19-original-editor';oldBox.append(...oldNodes);left.appendChild(oldBox);
+  const right=document.createElement('aside');right.className='sf19-editor-tools';
+  right.innerHTML='<div class="sf19-column-heading"><span class="sf19-column-icon">⚙</span><div><b>Công cụ cấu hình</b><small>Đổi vị trí trình bày, tên tiếng Việt và nguồn dữ liệu.</small></div></div><div class="notice" style="margin-bottom:12px">Chỉ đổi phần hiển thị và ánh xạ. Mã kỹ thuật <b>source / key / type</b> của “Biểu mẫu xác nhận” và “Hệ thống” vẫn được bảo vệ.</div><div class="sf19-tool-head"><div><h3>Thứ tự &amp; trường dữ liệu</h3><p>Kéo cả dòng hoặc dùng nút ↑ ↓. Vị trí 1 sẽ được trình bày trước.</p></div><span class="badge" id="sf19FieldCount">'+(form.fields||[]).length+' trường</span></div><div id="sf19FieldRows" class="sf19-field-list">'+editorRows(form)+'</div><div class="actions sf19-tool-actions"><button type="button" class="btn secondary" id="sf19RefreshFields">Bỏ thay đổi</button><button type="button" class="btn primary" id="sf19SaveFields">Lưu thứ tự &amp; tên trường</button></div><div id="sf19EditorProgress" style="margin-top:10px"></div>';
+  shell.append(left,right);body.replaceChildren(shell);
+  const map=q('#mapRows',oldBox);
+  if(map){
+   map.style.display='none';
+   const heading=map.previousElementSibling,title=heading?.previousElementSibling;
+   if(heading)heading.style.display='none';
+   if(title)title.style.display='none';
+  }
+  const oldSave=q('#saveMap',oldBox);if(oldSave)oldSave.style.display='none';
+  const list=q('#sf19FieldRows',right),progress=q('#sf19EditorProgress');
+  const syncOrder=()=>{
+   const rows=qa('.sf19-field-row',list);
+   rows.forEach((row,index)=>{row.querySelector('[data-sf19-number]').textContent=String(index+1);row.querySelector('[data-sf19-up]').disabled=index===0;row.querySelector('[data-sf19-down]').disabled=index===rows.length-1});
+  };
+  let dragging=null;
+  qa('.sf19-field-row',list).forEach(row=>{
+   row.querySelector('[data-sf19-up]').onclick=()=>{const previous=row.previousElementSibling;if(previous)list.insertBefore(row,previous);syncOrder()};
+   row.querySelector('[data-sf19-down]').onclick=()=>{const next=row.nextElementSibling;if(next)list.insertBefore(next,row);syncOrder()};
+   row.querySelector('[data-sf19-fine]').onclick=()=>window.fineTuneField?.(id,Number(row.dataset.sf19OriginalIndex));
+   row.addEventListener('dragstart',event=>{dragging=row;row.classList.add('sf19-dragging');event.dataTransfer.effectAllowed='move'});
+   row.addEventListener('dragend',()=>{row.classList.remove('sf19-dragging');dragging=null;syncOrder()});
+   row.addEventListener('dragover',event=>{event.preventDefault();if(!dragging||dragging===row)return;const box=row.getBoundingClientRect();if(event.clientY<box.top+box.height/2)list.insertBefore(dragging,row);else list.insertBefore(dragging,row.nextSibling);syncOrder()});
+  });
+  syncOrder();
+  q('#sf19RefreshFields').onclick=()=>window.editForm?.(id);
+  q('#sf19SaveFields').onclick=async event=>{
+   const button=event.currentTarget;button.disabled=true;button.textContent='Đang lưu…';
+   try{
+    const original=form.fields||[],next=qa('.sf19-field-row',list).map((row,order)=>{
+     const sourceField=original[Number(row.dataset.sf19OriginalIndex)],copy={...sourceField};
+     const label=text(row.querySelector('[data-role="label"]')?.value).trim();
+     if(label)copy.label=label;
+     const select=row.querySelector('[data-role="source"]'),editable=sourceField.sf19SourceEditable===true||sourceField.source==='custom';
+     if(select&&editable){
+      const parts=text(select.value).split('|'),source=parts.shift()||sourceField.source,key=parts.join('|');
+      copy.source=source;copy.key=key;copy.sf19SourceEditable=true;copy.sf19SourceLabel=sourceLabel(form,copy);
+     }else{copy.source=sourceField.source;copy.key=sourceField.key}
+     copy.order=order;return copy;
+    });
+    form.fields=next;form.updatedAt=stamp();await idbPut('forms',form);
+    if(typeof window.syncFormToDrive==='function')window.syncFormToDrive(form,true).catch(()=>{});
+    window.renderAdminForms?.();window.renderPublicForms?.();
+    await window.editForm?.(id,'Đã lưu thứ tự, tên trường tiếng Việt và nguồn dữ liệu.');
+   }catch(error){progress.innerHTML='<div class="notice bad">'+html(error?.message||error)+'</div>';button.disabled=false;button.textContent='Lưu thứ tự & tên trường'}
+  };
+ }
+
+ const baseEditForm=window.editForm;
+ if(typeof baseEditForm==='function')window.editForm=async function(id,successMessage){await baseEditForm(id);await enhanceEditor(id,successMessage)};
+
+ function installStyles(){
+  if(q('#sf19EditorStyle'))return;
+  const style=document.createElement('style');style.id='sf19EditorStyle';style.textContent=`
+   #modal .modalbox.wide{width:min(1500px,calc(100vw - 28px));max-width:1500px}
+   .sf19-editor-layout{display:grid;grid-template-columns:minmax(0,1.06fr) minmax(430px,.94fr);gap:18px;align-items:start}
+   .sf19-editor-content,.sf19-editor-tools{min-width:0}
+   .sf19-column-heading{display:flex;gap:10px;align-items:flex-start;padding:2px 0 13px}
+   .sf19-column-heading b{display:block;color:#164b62;font-size:1.06rem}
+   .sf19-column-heading small{display:block;margin-top:3px;color:#71808d;line-height:1.45}
+   .sf19-column-icon{display:grid;place-items:center;width:34px;height:34px;border-radius:10px;background:#e8f3f5;color:#0c6375;font-size:18px;flex:0 0 auto}
+   .sf19-status-card{border:1px solid #d6e4e8;border-radius:15px;padding:15px;background:linear-gradient(135deg,#f6fbfc,#f7fbf8);margin-bottom:14px;min-width:0}
+   .sf19-status-kicker{font-size:10px;letter-spacing:.11em;font-weight:950;color:#277080}
+   .sf19-status-card h3{margin:5px 0 4px;color:#123f59;overflow-wrap:anywhere}
+   .sf19-status-card p{margin:0;color:#66798a;line-height:1.5;overflow-wrap:anywhere}
+   .sf19-status-pills{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}
+   .sf19-original-editor{min-width:0}
+   .sf19-original-editor .section-box,.sf19-original-editor .source-banner{overflow-wrap:anywhere}
+   .sf19-original-editor .actions{flex-wrap:wrap}
+   .sf19-tool-head{display:flex;gap:10px;align-items:flex-start;justify-content:space-between;margin-bottom:10px}
+   .sf19-tool-head h3{margin:0;color:#164b62}
+   .sf19-tool-head p{margin:4px 0 0;color:#71808d;font-size:12px;line-height:1.45}
+   .sf19-field-list{display:grid;gap:9px;max-height:66vh;overflow:auto;padding:2px 2px 4px}
+   .sf19-field-row{display:grid;grid-template-columns:auto minmax(150px,1fr) minmax(190px,1.22fr) minmax(92px,.62fr);gap:9px;align-items:start;border:1px solid #dbe7eb;border-radius:13px;padding:10px;background:#fff;min-width:0;transition:border-color .15s,box-shadow .15s}
+   .sf19-field-row:hover{border-color:#9bc7d0;box-shadow:0 3px 12px rgba(17,72,92,.07)}
+   .sf19-field-row.sf19-dragging{opacity:.52;border-style:dashed}
+   .sf19-order-tools{display:flex;flex-direction:column;align-items:center;gap:4px;padding-top:18px}
+   .sf19-order-tools b{font-size:12px;color:#164b62;min-width:20px;text-align:center}
+   .sf19-drag{font-size:18px;line-height:18px;color:#87a2aa;cursor:grab}
+   .sf19-mini{padding:3px 7px!important;font-size:11px!important;line-height:1.2}
+   .sf19-field-row label{display:block;font-size:10px;font-weight:900;color:#607487;margin:0 0 4px}
+   .sf19-field-row input,.sf19-field-row select{width:100%;min-width:0}
+   .sf19-field-name small,.sf19-field-source small{display:block;margin-top:5px;color:#78909a;font-size:10px;line-height:1.35;overflow-wrap:anywhere}
+   .sf19-field-source .sf19-lock{color:#a56d32}
+   .sf19-field-meta{display:flex;flex-direction:column;gap:6px;align-items:flex-start;padding-top:18px;min-width:0}
+   .sf19-confidence{font-size:10px;color:#2c7a68;font-weight:900}
+   .sf19-confidence.low{color:#a33b3b}
+   .sf19-fine{font-size:10px!important;padding:5px 7px!important;white-space:normal}
+   .sf19-tool-actions{justify-content:flex-end;margin-top:12px}
+   .sf19-save-note{margin-bottom:12px}
+   #av-records .record,#av-records .student-card,#av-records .student-main,#av-records .record-parent>summary{min-width:0}
+   #av-records .record>div:first-child{min-width:0}
+   #av-records .record b,#av-records .record small,#av-records .student-main b,#av-records .student-main small{overflow-wrap:anywhere;word-break:break-word;white-space:normal}
+   #av-records .badge{max-width:100%;white-space:normal;overflow-wrap:anywhere;text-align:center}
+   @media(max-width:1120px){.sf19-editor-layout{grid-template-columns:1fr}.sf19-field-list{max-height:none}}
+   @media(max-width:760px){.sf19-field-row{grid-template-columns:auto minmax(0,1fr)}.sf19-field-name,.sf19-field-source{grid-column:2}.sf19-field-meta{grid-column:2;flex-direction:row;align-items:center;flex-wrap:wrap;padding-top:0}.sf19-tool-actions{justify-content:stretch}.sf19-tool-actions .btn{flex:1}}
+  `;document.head.appendChild(style);
+ }
+ function boot(){installStyles()}
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
+})();
+
+/* ===== SmartForms 20.0 · Thiết lập hệ thống: 2 Apps Script riêng (Drive + Gmail) · sửa bố cục · chạy nhẹ hơn =====
+   - Mục “Thiết lập hệ thống” nằm đúng cột nội dung (trước đây bị rơi xuống cột menu nên vỡ giao diện).
+   - Mỗi dịch vụ là một dự án Apps Script tạo mới, có mã, URL /exec và token riêng:
+       01 · SmartForms Gmail  → Gmail Bridge (tạo bản nháp + PDF, trạng thái Boomerang)
+       02 · SmartForms Drive  → Drive phân cấp (biểu mẫu, hồ sơ, cổng phụ huynh, tài khoản)
+     Cấu hình Gmail lưu thẳng vào kho mà mục “Gửi email” đang dùng, không còn ghi nhầm sang kho cũ.
+   - Bỏ 4 mã “tách tác vụ” bản 19.0 vì hệ thống không gọi tới các mã đó.
+   - Ô mật khẩu/token chỉ giữ nút chữ “Hiện/Ẩn”, tắt biểu tượng con mắt của trình duyệt.
+*/
+(function installSmartForms20(){
+ 'use strict';
+ if(window.__sf20Installed)return;
+ window.__sf20Installed=true;
+ const q=(s,r=document)=>r.querySelector(s);
+ const qa=(s,r=document)=>[...r.querySelectorAll(s)];
+ const text=v=>String(v??'');
+ const html=v=>typeof esc==='function'?esc(v):text(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const GMAIL_KEY='gmail_bridge_v1';
+
+ function copyText(value){
+  if(navigator.clipboard?.writeText)return navigator.clipboard.writeText(text(value)).then(()=>true).catch(()=>fallback());
+  return Promise.resolve(fallback());
+  function fallback(){const a=document.createElement('textarea');a.value=text(value);a.style.cssText='position:fixed;left:-9999px;opacity:0';document.body.appendChild(a);a.select();let ok=false;try{ok=document.execCommand('copy')}catch{}a.remove();return ok}
+ }
+ function execUrl(value){
+  const raw=text(value).trim().replace(/\/+$/,'');if(!raw)return'';
+  try{const u=new URL(raw);return u.protocol==='https:'&&u.hostname==='script.google.com'&&/^\/macros\/s\/[-\w]+\/exec$/i.test(u.pathname)?u.origin+u.pathname:''}catch{return''}
+ }
+ function siteUrl(value){
+  const raw=text(value).trim();if(!raw)return'';
+  try{const u=new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(raw)?raw:'https://'+raw);if(!['http:','https:'].includes(u.protocol))return'';u.hash='';u.search='';return u.toString()}catch{return''}
+ }
+ function folderUrl(value){
+  const raw=text(value).trim();if(!raw)return'';
+  const m=raw.match(/\/folders\/([-\w]{15,})/i)||raw.match(/[?&]id=([-\w]{15,})/i)||raw.match(/^([-\w]{15,})$/);
+  if(!m)throw new Error('Link thư mục Google Drive chưa đúng. Hãy sao chép toàn bộ link có /folders/.');
+  const key=raw.match(/[?&]resourcekey=([^&#]+)/i)?.[1]||'';
+  return'https://drive.google.com/drive/folders/'+m[1]+(key?'?resourcekey='+encodeURIComponent(decodeURIComponent(key)):'');
+ }
+ function setBox(id,message,kind=''){const box=q('#'+id);if(!box)return;box.innerHTML=message?'<div class="notice'+(kind?' '+kind:'')+'">'+message+'</div>':''}
+ function busy(button,label){if(!button)return()=>{};const old=button.textContent;button.disabled=true;button.textContent=label;return()=>{if(button.isConnected){button.disabled=false;button.textContent=old}}}
+ function errText(e){return html(text(e?.message||e)||'Lỗi không xác định.')}
+
+ async function gmailData(){const own=await idbGet('settings',GMAIL_KEY)||{};return{id:GMAIL_KEY,...own,appsScriptUrl:text(own.appsScriptUrl),appsScriptToken:text(own.appsScriptToken)}}
+ async function driveData(){const d=await idbGet('settings','drive')||{};return{...d,id:'drive',appsScriptUrl:text(d.appsScriptUrl),appsScriptToken:text(d.appsScriptToken),publicSiteUrl:text(d.publicSiteUrl),folderUrl:text(d.folderUrl||Object.values(d.formFolders||{}).find(Boolean)||''),formFolders:{...(d.formFolders||{})},autoForms:d.autoForms!==false,autoApps:d.autoApps!==false}}
+
+ /* Chuyển cấu hình Gmail đã nhập ở bản 18.0/19.0 (lưu nhầm kho) sang kho Gmail Bridge thật. */
+ async function migrateGmail(){
+  try{
+   const own=await gmailData();if(own.appsScriptUrl&&own.appsScriptToken)return;
+   const split=(await idbGet('settings','appsScriptServices'))?.services?.gmail||{};
+   let url=execUrl(split.endpoint),token=text(split.token).trim();
+   if(!url||!token){const g=await idbGet('settings','gmail')||{};const d=await driveData();const gu=execUrl(g.endpoint);if(gu&&gu!==execUrl(d.appsScriptUrl)&&text(g.token).trim()){url=gu;token=text(g.token).trim()}}
+   if(url&&token)await idbPut('settings',{...own,id:GMAIL_KEY,appsScriptUrl:url,appsScriptToken:token});
+  }catch{}
+ }
+
+ function passwordRow(name,value,placeholder){
+  return'<div class="password-field-row"><input name="'+name+'" type="password" value="'+html(value)+'" autocomplete="off" spellcheck="false" placeholder="'+html(placeholder)+'"><button type="button" class="password-toggle" data-sf20-eye aria-label="Hiển thị">Hiện</button></div>';
+ }
+ function bindToggles(root){
+  qa('[data-sf20-eye]',root).forEach(b=>b.onclick=()=>{const i=b.previousElementSibling;const show=i.type==='password';i.type=show?'text':'password';b.textContent=show?'Ẩn':'Hiện';b.setAttribute('aria-label',show?'Ẩn':'Hiển thị')});
+ }
+ function steps(items){return'<ol class="sf20-steps">'+items.map(x=>'<li>'+x+'</li>').join('')+'</ol>'}
+
+ function ensureSystemPane(){
+  const dash=q('#av-dashboard'),holder=dash?.parentElement;if(!holder)return null;
+  let pane=q('#av-system');
+  if(!pane){pane=document.createElement('div');pane.id='av-system';pane.className='hidden';holder.appendChild(pane)}
+  else if(pane.parentElement!==holder)holder.appendChild(pane);
+  return pane;
+ }
+
+ async function renderSystem(){
+  const pane=ensureSystemPane();if(!pane)return;
+  pane.classList.remove('hidden');
+  await migrateGmail();
+  const g=await gmailData(),d=await driveData();
+  const gReady=!!(execUrl(g.appsScriptUrl)&&g.appsScriptToken),dReady=!!(execUrl(d.appsScriptUrl)&&d.appsScriptToken&&d.folderUrl);
+  const sameUrl=gReady&&execUrl(g.appsScriptUrl)===execUrl(d.appsScriptUrl);
+  pane.innerHTML=
+   '<div class="sectionHead"><div><h2>Thiết lập hệ thống</h2><p>Hai dịch vụ chạy trên <b>hai dự án Apps Script tạo mới, độc lập</b>. Mỗi dự án có mã, URL /exec và token riêng; dán nhầm chéo sẽ bị từ chối.</p></div></div>'+
+   (sameUrl?'<div class="notice bad" style="margin-bottom:14px">URL Gmail đang trùng URL Drive. Hãy tạo hai dự án Apps Script riêng và dán đúng URL của từng dự án.</div>':'')+
+   '<div class="sf20-grid">'+
+   // ---------- GMAIL ----------
+   '<section class="card panel sf20-card"><div class="sf20-head"><span class="sf20-num">01</span><div><h3>SmartForms Gmail</h3><p>Tạo bản nháp Gmail kèm PDF hồ sơ, đọc trạng thái Boomerang/Đã gửi.</p></div><span class="badge '+(gReady?'ok':'warn')+'">'+(gReady?'Đã cấu hình':'Chưa cấu hình')+'</span></div>'+
+   steps(['Vào <b>script.google.com</b> → <b>Dự án mới</b>, đặt tên <b>SmartForms Gmail</b>.','Xóa mã mẫu, dán toàn bộ mã <b>SF_Gmail.gs</b> bên dưới → Lưu.','Chọn hàm <b>setupSmartFormsGmail</b> → <b>Chạy</b> → Cho phép quyền Gmail.','Mở <b>Nhật ký thực thi</b>, sao chép chuỗi sau <b>SMARTFORMS_GMAIL_TOKEN:</b>.','<b>Triển khai → Tùy chọn triển khai mới → Ứng dụng web</b>: Execute as <b>Me</b>, Who has access <b>Anyone</b> → sao chép URL <b>/exec</b>.'])+
+   '<form id="sf20GmailForm" class="formgrid"><div class="field full"><label>URL Web App Gmail (/exec)</label><input name="url" value="'+html(g.appsScriptUrl)+'" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off" spellcheck="false"></div><div class="field full"><label>SMARTFORMS_GMAIL_TOKEN</label>'+passwordRow('token',g.appsScriptToken,'Chuỗi token trong Nhật ký thực thi')+'</div><div class="field full sf20-actions"><button class="btn primary" type="submit">Lưu &amp; kiểm tra Gmail</button><button class="btn ghost" type="button" id="sf20GmailTest">Chỉ kiểm tra</button></div></form><div id="sf20GmailBox"></div>'+
+   '<div class="sf20-code"><div class="sf20-code-bar"><b>SF_Gmail.gs</b><span class="field-hint" id="sf20GmailSize"></span><button class="btn secondary" type="button" id="sf20CopyGmail">Sao chép mã Gmail</button></div><textarea id="sf20GmailCode" readonly spellcheck="false"></textarea></div>'+
+   '</section>'+
+   // ---------- DRIVE ----------
+   '<section class="card panel sf20-card"><div class="sf20-head"><span class="sf20-num">02</span><div><h3>SmartForms Drive</h3><p>Lưu biểu mẫu và hồ sơ theo thư mục phân cấp, phục vụ cổng phụ huynh và đăng nhập quản trị.</p></div><span class="badge '+(dReady?'ok':'warn')+'">'+(dReady?'Đã cấu hình':'Chưa cấu hình')+'</span></div>'+
+   steps(['Tạo thêm <b>một dự án mới khác</b>, đặt tên <b>SmartForms Drive</b> (không dùng chung dự án Gmail).','Dán toàn bộ mã <b>SF_Drive.gs</b> bên dưới → Lưu.','Chạy hàm <b>setupSmartFormsDrive</b> → Cho phép quyền Drive.','Sao chép chuỗi sau <b>SMARTFORMS_DRIVE_TOKEN:</b> trong Nhật ký thực thi.','Triển khai Ứng dụng web (Me / Anyone) → sao chép URL <b>/exec</b>. Tài khoản này phải có quyền <b>Chỉnh sửa</b> thư mục mẹ.'])+
+   '<form id="sf20DriveForm" class="formgrid"><div class="field full"><label>URL Web App Drive (/exec)</label><input name="url" value="'+html(d.appsScriptUrl)+'" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off" spellcheck="false"></div><div class="field full"><label>SMARTFORMS_DRIVE_TOKEN</label>'+passwordRow('token',d.appsScriptToken,'Chuỗi token trong Nhật ký thực thi')+'</div><div class="field full"><label>Thư mục mẹ Google Drive</label><input name="folder" value="'+html(d.folderUrl)+'" placeholder="https://drive.google.com/drive/folders/..." autocomplete="off" spellcheck="false"></div><div class="field full"><label>Website chính thức của nhà trường</label><input name="site" value="'+html(d.publicSiteUrl)+'" placeholder="https://ten-truong.github.io/ten-du-an/" autocomplete="off" spellcheck="false"></div><div class="field"><label class="sf20-check"><input name="autoForms" type="checkbox" '+(d.autoForms?'checked':'')+'> Tự đồng bộ biểu mẫu</label></div><div class="field"><label class="sf20-check"><input name="autoApps" type="checkbox" '+(d.autoApps?'checked':'')+'> Tự đồng bộ hồ sơ</label></div><div class="field full sf20-actions"><button class="btn primary" type="submit">Lưu &amp; kiểm tra Drive</button><button class="btn ghost" type="button" id="sf20DriveSync">Đồng bộ lên Drive</button><button class="btn ghost" type="button" id="sf20DrivePull">Lấy dữ liệu về</button></div></form><div id="sf20DriveBox"></div>'+
+   '<div class="sf20-code"><div class="sf20-code-bar"><b>SF_Drive.gs</b><span class="field-hint" id="sf20DriveSize"></span><button class="btn secondary" type="button" id="sf20CopyDrive">Sao chép mã Drive</button></div><textarea id="sf20DriveCode" readonly spellcheck="false"></textarea></div>'+
+   '</section></div>'+
+   '<div class="setup-guide sf20-foot"><b>Khi sửa mã:</b> dán mã mới → Lưu → <b>Triển khai → Quản lý các lượt triển khai → Chỉnh sửa (bút chì) → Phiên bản: Phiên bản mới → Triển khai</b>. Làm vậy URL /exec và token giữ nguyên, không cần nhập lại.</div>';
+
+  const gmailCode=text(window.GMAIL_BRIDGE_CODE),driveCode=text(window.DRIVE_HIERARCHY_APPS_SCRIPT);
+  q('#sf20GmailCode').value=gmailCode||'// Không tải được mã Gmail. Hãy tải lại trang.';
+  q('#sf20DriveCode').value=driveCode||'// Không tải được mã Drive. Hãy tải lại trang.';
+  q('#sf20GmailSize').textContent=gmailCode.split('\n').length+' dòng';
+  q('#sf20DriveSize').textContent=driveCode.split('\n').length+' dòng';
+  bindToggles(pane);
+  const copyBtn=(id,code,label)=>{const b=q('#'+id);b.onclick=async()=>{b.textContent=await copyText(code)?'Đã sao chép ✓':'Không sao chép được';setTimeout(()=>{if(b.isConnected)b.textContent=label},1600)}};
+  copyBtn('sf20CopyGmail',gmailCode,'Sao chép mã Gmail');
+  copyBtn('sf20CopyDrive',driveCode,'Sao chép mã Drive');
+
+  // ---- Gmail ----
+  const gmailCheck=async()=>{
+   const api=window.sfGmailBridge;if(!api)throw new Error('Chưa tải được mô-đun Gmail. Hãy tải lại trang.');
+   const r=await api.health();
+   return'<b>Gmail đã kết nối.</b>'+(r.email?' Tài khoản gửi: <b>'+html(r.email)+'</b>.':'')+' Có thể sang mục <b>Gửi email</b> để tạo thư.';
+  };
+  q('#sf20GmailForm').onsubmit=async e=>{
+   e.preventDefault();const f=e.currentTarget,done=busy(e.submitter,'Đang kiểm tra…');
+   try{
+    const url=execUrl(f.url.value),token=f.token.value.trim(),drive=await driveData();
+    if(!url)throw new Error('URL Gmail chưa đúng. URL phải có dạng https://script.google.com/macros/s/…/exec');
+    if(!token)throw new Error('Chưa nhập SMARTFORMS_GMAIL_TOKEN.');
+    if(url===execUrl(drive.appsScriptUrl))throw new Error('Đây là URL của dự án Drive. Gmail cần một dự án Apps Script riêng.');
+    if(token===drive.appsScriptToken)throw new Error('Token này là token Drive. Hãy dùng token do setupSmartFormsGmail tạo.');
+    await window.sfGmailBridge.save({appsScriptUrl:url,appsScriptToken:token});
+    setBox('sf20GmailBox','Đang kết nối Gmail…');
+    setBox('sf20GmailBox',await gmailCheck(),'ok');
+    renderBadges();
+   }catch(err){setBox('sf20GmailBox',errText(err),'bad')}finally{done()}
+  };
+  q('#sf20GmailTest').onclick=async e=>{const done=busy(e.currentTarget,'Đang kiểm tra…');try{setBox('sf20GmailBox',await gmailCheck(),'ok')}catch(err){setBox('sf20GmailBox',errText(err),'bad')}finally{done()}};
+
+  // ---- Drive ----
+  q('#sf20DriveForm').onsubmit=async e=>{
+   e.preventDefault();const f=e.currentTarget,done=busy(e.submitter,'Đang lưu…');
+   try{
+    const url=execUrl(f.url.value),token=f.token.value.trim(),folder=folderUrl(f.folder.value),site=siteUrl(f.site.value),gm=await gmailData();
+    if(!url)throw new Error('URL Drive chưa đúng. URL phải có dạng https://script.google.com/macros/s/…/exec');
+    if(!token)throw new Error('Chưa nhập SMARTFORMS_DRIVE_TOKEN.');
+    if(!folder)throw new Error('Chưa nhập thư mục mẹ Google Drive.');
+    if(url===execUrl(gm.appsScriptUrl))throw new Error('Đây là URL của dự án Gmail. Drive cần một dự án Apps Script riêng.');
+    const cur=await driveData(),changedFolder=cur.folderUrl!==folder;
+    await idbPut('settings',{...cur,id:'drive',appsScriptUrl:url,appsScriptToken:token,folderUrl:folder,publicSiteUrl:site,autoForms:f.autoForms.checked,autoApps:f.autoApps.checked});
+    if(changedFolder){for(const form of await idbAll('forms')){if(form.driveFolderUrl!==folder){form.driveFolderUrl=folder;await idbPut('forms',form)}}}
+    setBox('sf20DriveBox','Đã lưu. Đang kiểm tra quyền ghi thư mục…');
+    const check=window.driveHierarchyHealth;
+    if(typeof check!=='function')throw new Error('Đã lưu, nhưng chưa tải được hàm kiểm tra Drive. Hãy tải lại trang.');
+    const r=await check(folder,{force:true});
+    setBox('sf20DriveBox','<b>Drive đã kết nối.</b>'+(r?.folderName?' Thư mục mẹ: <b>'+html(r.folderName)+'</b>.':'')+(r?.serviceAccount?' Tài khoản: <b>'+html(r.serviceAccount)+'</b>.':''),'ok');
+    renderBadges();
+   }catch(err){setBox('sf20DriveBox',errText(err),'bad')}finally{done()}
+  };
+  q('#sf20DriveSync').onclick=async e=>{const done=busy(e.currentTarget,'Đang đồng bộ…');try{const fn=window.syncAllDriveHierarchy;if(typeof fn!=='function')throw new Error('Chưa tải được hàm đồng bộ Drive.');setBox('sf20DriveBox','Đang đồng bộ biểu mẫu và hồ sơ…');await fn();setBox('sf20DriveBox','Đã đồng bộ lên Drive.','ok')}catch(err){setBox('sf20DriveBox',errText(err),'bad')}finally{done()}};
+  q('#sf20DrivePull').onclick=async e=>{const done=busy(e.currentTarget,'Đang lấy…');try{const fn=window.pullDriveHierarchy;if(typeof fn!=='function')throw new Error('Chưa tải được hàm lấy dữ liệu Drive.');setBox('sf20DriveBox','Đang lấy dữ liệu mới nhất…');const r=await fn();setBox('sf20DriveBox','Đã lấy dữ liệu từ Drive'+(r&&r.restoredApps!==undefined?': '+html(r.restoredApps)+' hồ sơ, '+html(r.restoredForms)+' biểu mẫu':'')+'.','ok')}catch(err){setBox('sf20DriveBox',errText(err),'bad')}finally{done()}};
+ }
+ async function renderBadges(){
+  const pane=q('#av-system');if(!pane)return;
+  const g=await gmailData(),d=await driveData(),b=qa('.sf20-head .badge',pane);
+  const set=(el,ok)=>{if(!el)return;el.className='badge '+(ok?'ok':'warn');el.textContent=ok?'Đã cấu hình':'Chưa cấu hình'};
+  set(b[0],execUrl(g.appsScriptUrl)&&g.appsScriptToken);set(b[1],execUrl(d.appsScriptUrl)&&d.appsScriptToken&&d.folderUrl);
+ }
+ window.sf20RenderSystem=renderSystem;
+
+ /* Mục Gửi email: cấu hình + mã Gmail đã chuyển sang “Thiết lập hệ thống”. */
+ const baseRenderGmail=window.renderGmail;
+ if(typeof baseRenderGmail==='function')window.renderGmail=async function(...args){
+  const out=await baseRenderGmail.apply(this,args);
+  const pane=q('#av-gmail'),cfg=pane&&q('#gmailBridgeCfg',pane),box=cfg?.closest('details');
+  if(box&&!q('#sf20GmailMoved',pane)){
+   box.style.display='none';
+   const g=await gmailData(),ok=!!(execUrl(g.appsScriptUrl)&&g.appsScriptToken);
+   const note=document.createElement('div');note.id='sf20GmailMoved';note.className='notice '+(ok?'ok':'warn');note.style.margin='12px 0';
+   note.innerHTML=(ok?'Gmail đã được cấu hình trong <b>Thiết lập hệ thống</b>.':'Chưa cấu hình Gmail. Mã và cấu hình Gmail nằm ở <b>Thiết lập hệ thống</b>.')+' <button type="button" class="btn ghost" style="margin-left:8px;padding:6px 10px" data-sf20-go-system>Mở Thiết lập hệ thống</button>';
+   box.parentNode.insertBefore(note,box);
+   q('[data-sf20-go-system]',note).onclick=()=>window.showAdminView?.('system');
+  }
+  return out;
+ };
+
+ function installStyles(){
+  if(q('#sf20Style'))return;
+  const s=document.createElement('style');s.id='sf20Style';s.textContent=`
+   input::-ms-reveal,input::-ms-clear{display:none!important;width:0;height:0}
+   #av-system{min-width:0}
+   .sf20-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
+   .sf20-card{min-width:0;display:flex;flex-direction:column;gap:12px}
+   .sf20-head{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:start}
+   .sf20-head h3{margin:0 0 3px;color:#123f59;font-size:1.1rem}
+   .sf20-head p{margin:0;color:#6b7c8c;font-size:.86rem;line-height:1.5}
+   .sf20-num{width:38px;height:38px;display:grid;place-items:center;border-radius:11px;background:#e7f1f5;color:#0d5e78;font-weight:950}
+   .sf20-steps{margin:0;padding:12px 14px 12px 32px;border-radius:12px;background:#f6f9fb;border:1px solid #dfe9ee;color:#4d6072;font-size:.86rem;line-height:1.6}
+   .sf20-steps li+li{margin-top:3px}
+   .sf20-actions{display:flex;gap:8px;flex-wrap:wrap}
+   .sf20-check{display:flex!important;gap:8px;align-items:center;font-weight:700}
+   .sf20-check input{width:auto}
+   .sf20-code{border:1px solid #d7e4e9;border-radius:13px;background:#fbfdfe;padding:10px;min-width:0}
+   .sf20-code-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+   .sf20-code-bar b{color:#164b62}
+   .sf20-code-bar .btn{margin-left:auto}
+   .sf20-code textarea{width:100%;height:280px;min-height:180px;resize:vertical;font:11px/1.45 Consolas,Monaco,monospace;white-space:pre;overflow:auto;background:#fff}
+   .sf20-foot{margin-top:16px}
+   @media(max-width:1180px){.sf20-grid{grid-template-columns:1fr}}
+   @media(max-width:620px){.sf20-head{grid-template-columns:auto minmax(0,1fr)}.sf20-head .badge{grid-column:2;justify-self:start}.sf20-code-bar .btn{margin-left:0;width:100%}}
+  `;document.head.appendChild(s);
+ }
+ function boot(){installStyles();ensureSystemPane();migrateGmail();if(q('#av-system:not(.hidden)'))renderSystem().catch(()=>{})}
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
+})();
+/* ===== Kết thúc SmartForms 20.0 ===== */
+
+/* ===== SmartForms 21.0 · Bố cục 2 cột biểu mẫu, màu theo từng biểu mẫu, gọn mục Gmail ===== */
+(function installSmartForms21(){
+ 'use strict';
+ if(window.__sf21Installed)return;
+ window.__sf21Installed=true;
+
+ const q=(s,r=document)=>r.querySelector(s),qa=(s,r=document)=>[...r.querySelectorAll(s)];
+ /* Mỗi biểu mẫu một màu cố định; hồ sơ thuộc biểu mẫu nào dùng đúng màu đó. */
+ const PALETTE=['#0f766e','#2563eb','#7c3aed','#c2410c','#be185d','#15803d','#0e7490','#4f46e5'];
+ let colorMap=new Map(),colorLoading=null;
+ const norm=v=>String(v||'').trim().toLowerCase();
+ function hashIndex(text){let h=0;for(const c of norm(text))h=(h*31+c.charCodeAt(0))>>>0;return h%PALETTE.length}
+ async function loadColors(){
+  if(colorLoading)return colorLoading;
+  colorLoading=(async()=>{
+   try{
+    const forms=(await idbAll('forms')).sort((a,b)=>String(a.createdAt||'').localeCompare(String(b.createdAt||'')));
+    const map=new Map();forms.forEach((f,i)=>{const c=PALETTE[i%PALETTE.length];map.set(norm(f.title),c);if(f.id)map.set('id:'+f.id,c)});
+    colorMap=map;
+   }catch{}
+   colorLoading=null;
+  })();
+  return colorLoading;
+ }
+ const colorFor=title=>colorMap.get(norm(title))||PALETTE[hashIndex(title)];
+
+ /* ---------- Biểu mẫu: cột trái nội dung + trạng thái, cột phải công cụ ---------- */
+ function decorateForms(){
+  const pane=q('#av-forms');if(!pane)return;
+  qa('.card.panel > .record',pane).forEach(row=>{
+   const title=q('b',row)?.textContent||'';
+   row.style.setProperty('--fc',colorFor(title));
+   if(row.dataset.sf21)return;
+   row.dataset.sf21='1';row.classList.add('sf21-form');
+   const main=row.firstElementChild,tools=q(':scope > .actions',row);
+   main?.classList.add('sf21-form-main');tools?.classList.add('sf21-form-tools');
+   const meta=main&&q('.muted',main);
+   if(meta){
+    meta.classList.add('sf21-meta');
+    [...meta.childNodes].forEach(node=>{
+     if(node.nodeType===3){
+      node.textContent.split('·').map(x=>x.trim()).filter(Boolean).forEach(text=>{const s=document.createElement('span');s.className='sf21-chip';s.textContent=text;meta.insertBefore(s,node)});
+      node.remove();
+     }else if(!node.classList?.contains('badge'))node.classList?.add('sf21-chip');
+    });
+   }
+  });
+ }
+
+ /* ---------- Hồ sơ: 2 nút cùng một dòng, màu nhóm theo biểu mẫu ---------- */
+ function decorateRecords(){
+  const pane=q('#av-records');if(!pane)return;
+  const pull=q('#recordsPullDrive',pane),sync=q('#recordsSyncDrive',pane);
+  if(pull&&!pull.classList.contains('primary')){pull.classList.remove('secondary','ghost');pull.classList.add('primary')}
+  if(sync&&!sync.classList.contains('secondary')){sync.classList.remove('primary','ghost');sync.classList.add('secondary')}
+  (pull||sync)?.parentElement?.classList.add('sf21-sync-row');
+  qa('details.record-parent',pane).forEach(group=>{
+   const title=q('summary b',group)?.textContent||'';
+   group.style.setProperty('--fc',colorFor(title));
+   group.classList.add('sf21-group');
+  });
+ }
+
+ /* ---------- Gửi email: chỉ còn dòng “Chưa cấu hình” khi thật sự chưa cấu hình ---------- */
+ function decorateGmail(){
+  const pane=q('#av-gmail');if(!pane)return;
+  const sep=q('#gmailServiceSeparation',pane);if(sep)sep.style.display='none';
+  qa('.card.panel > .notice',pane).forEach(n=>{if(n.id!=='sf20GmailMoved'&&/Gmail Bridge 1\.1/.test(n.textContent))n.style.display='none'});
+  const moved=q('#sf20GmailMoved',pane);
+  if(moved){
+   if(moved.classList.contains('ok'))moved.style.display='none';
+   else if(!moved.dataset.sf21){
+    moved.dataset.sf21='1';moved.classList.add('sf21-config-note');moved.removeAttribute('style');
+    const btn=q('button',moved),span=document.createElement('span');
+    [...moved.childNodes].forEach(node=>{if(node!==btn)span.appendChild(node)});
+    moved.insertBefore(span,btn);
+    if(btn){btn.removeAttribute('style');btn.classList.add('sf21-config-btn')}
+   }
+  }
+  const ready=q('#boomerangReady',pane),label=ready?.closest('label');
+  if(label&&!label.dataset.sf21){
+   label.dataset.sf21='1';label.removeAttribute('style');label.classList.add('sf21-check');
+   const text=document.createElement('span');
+   [...label.childNodes].forEach(node=>{if(node!==ready)text.appendChild(node)});
+   text.innerHTML=text.innerHTML.trim();
+   ready.removeAttribute('style');
+   label.append(ready,text);
+   label.closest('.section-box')?.classList.add('sf21-boom');
+  }
+  q('#mailAppChoices',pane)?.classList.add('sf21-choices');
+ }
+
+ let queued=false;
+ function schedule(){
+  if(queued)return;queued=true;
+  requestAnimationFrame(async()=>{
+   queued=false;
+   try{
+    if(q('#av-forms .record, #av-records details.record-parent'))await loadColors();
+    decorateForms();decorateRecords();decorateGmail();
+   }catch(error){console.warn('SmartForms 21',error)}
+  });
+ }
+
+ function installStyles(){
+  if(q('#sf21Style'))return;
+  const s=document.createElement('style');s.id='sf21Style';s.textContent=`
+   /* Biểu mẫu */
+   #av-forms .card.panel{display:flex;flex-direction:column;gap:12px}
+   #av-forms .record.sf21-form{display:grid;grid-template-columns:minmax(0,1fr) 232px;align-items:stretch;gap:0;padding:0;margin:0;overflow:hidden;
+    border:1px solid color-mix(in srgb,var(--fc) 26%,#dfe7ee);border-left:6px solid var(--fc);border-radius:14px;
+    background:color-mix(in srgb,var(--fc) 6%,#fff)}
+   #av-forms .sf21-form-main{min-width:0;padding:16px 20px;display:flex;flex-direction:column;justify-content:center;gap:10px}
+   #av-forms .sf21-form-main > b{font-size:1.02rem!important;line-height:1.4;color:#12324a}
+   #av-forms .sf21-meta{display:flex!important;flex-wrap:wrap;gap:6px;align-items:center;margin:0!important}
+   #av-forms .sf21-meta .badge,#av-forms .sf21-chip{display:inline-flex;align-items:center;min-height:26px;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:700;line-height:1.2;margin:0}
+   #av-forms .sf21-meta .badge{gap:6px;background:#fff7ed;border:1px solid #fed7aa;color:#9a3412}
+   #av-forms .sf21-meta .badge::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+   #av-forms .sf21-meta .badge.ok{background:#ecfdf5;border-color:#a7f3d0;color:#047857}
+   #av-forms .sf21-chip{background:#fff;border:1px solid color-mix(in srgb,var(--fc) 22%,#e3e9ef);color:#4a5d70}
+   #av-forms .sf21-form-tools{display:flex!important;flex-direction:column;justify-content:center;gap:8px;margin:0;padding:14px;
+    background:color-mix(in srgb,var(--fc) 11%,#fff);border-left:1px solid color-mix(in srgb,var(--fc) 22%,#e3e9ef)}
+   #av-forms .sf21-form-tools .btn{width:100%;margin:0;justify-content:center;text-align:center;white-space:nowrap}
+   @media(max-width:760px){
+    #av-forms .record.sf21-form{grid-template-columns:1fr}
+    #av-forms .sf21-form-tools{border-left:0;border-top:1px solid color-mix(in srgb,var(--fc) 22%,#e3e9ef)}
+   }
+   /* Hồ sơ */
+   #av-records .sf21-sync-row{display:flex!important;flex-direction:row!important;flex-wrap:nowrap;gap:8px;align-items:center}
+   #av-records .sf21-sync-row .btn{white-space:nowrap;margin:0}
+   @media(max-width:620px){#av-records .sf21-sync-row{flex-wrap:wrap}}
+   #av-records details.sf21-group{border:1px solid color-mix(in srgb,var(--fc) 28%,#dfe7ee)!important;border-left:6px solid var(--fc)!important;border-radius:14px;overflow:hidden;background:color-mix(in srgb,var(--fc) 4%,#fff)}
+   #av-records details.sf21-group > summary{background:color-mix(in srgb,var(--fc) 11%,#fff)!important}
+   #av-records details.sf21-group > summary .source-icon{background:var(--fc)!important;color:#fff}
+   #av-records details.sf21-group > summary b{color:color-mix(in srgb,var(--fc) 70%,#0f2436)}
+   #av-records details.sf21-group .student-card{border-top:3px solid color-mix(in srgb,var(--fc) 70%,#fff)!important}
+   #av-records details.sf21-group .student-avatar{background:var(--fc)!important}
+   /* Gửi email */
+   #av-gmail .sf21-config-note{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 14px}
+   #av-gmail .sf21-config-note::before{top:50%!important;transform:translateY(-50%)}
+   #av-gmail .sf21-config-note > span{flex:1 1 260px}
+   #av-gmail .sf21-config-btn{margin-left:auto;padding:7px 12px}
+   #av-gmail .sf21-boom{margin-top:0!important;background:#f5f3ff!important;border:1px solid #ddd6fe!important;border-left:6px solid #7c3aed!important;border-radius:14px}
+   #av-gmail .sf21-boom > b{color:#4c1d95}
+   #av-gmail label.sf21-check{display:flex!important;align-items:center;gap:10px;margin:14px 0 0;padding:10px 12px;border-radius:10px;background:#fff;border:1px solid #e4defc;font-size:13px;font-weight:700;color:#3f4b63;cursor:pointer;line-height:1.4}
+   #av-gmail label.sf21-check input{flex:none;width:18px!important;height:18px!important;min-height:0!important;margin:0!important;padding:0;accent-color:#7c3aed}
+   #av-gmail label.sf21-check b{color:#4c1d95}
+   #av-gmail .sf21-choices label{align-items:center!important}
+   #av-gmail .sf21-choices input[type=checkbox]{width:17px!important;height:17px!important;min-height:0!important;margin:0!important;flex:none}
+   #av-gmail .sf21-choices{border-color:#bfdbfe!important;border-left:6px solid #2563eb!important;background:#f8fbff!important}
+  `;document.head.appendChild(s);
+ }
+
+ function boot(){
+  installStyles();schedule();
+  new MutationObserver(records=>{for(const r of records)if(r.addedNodes.length){schedule();return}}).observe(document.body,{childList:true,subtree:true});
+ }
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
+})();
+/* ===== Kết thúc SmartForms 21.0 ===== */
+
+/* ===== SmartForms 22.0 · Drive đa dự án, định tuyến theo tác vụ =====
+   - SmartForms Drive có ba dự án chuyên trách: Ghi & tài khoản, Đọc dữ liệu, Cổng phụ huynh.
+   - Giữ fallback về URL Drive cũ để không làm mất dữ liệu hoặc liên kết đã bàn giao.
+   - Không hứa một hệ số tốc độ cố định; lợi ích đến từ việc tách hàng đợi, cache và lượt ghi/đọc.
+*/
+(function installSmartForms22(){
+ 'use strict';
+ if(window.__sf22Installed)return;
+ window.__sf22Installed=true;
+
+ const q=(s,r=document)=>r.querySelector(s),qa=(s,r=document)=>[...r.querySelectorAll(s)];
+ const text=v=>String(v??'');
+ const html=v=>typeof esc==='function'?esc(v):text(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const MODULES=[
+  {key:'write',number:'01',title:'SmartForms Drive · Ghi & tài khoản',short:'Ghi dữ liệu',desc:'Tạo cây thư mục, ghi/thay PDF hoặc Word, xóa đồng bộ và xử lý đăng nhập/recovery.',role:'write'},
+  {key:'read',number:'02',title:'SmartForms Drive · Đọc dữ liệu',short:'Đọc dữ liệu',desc:'Đọc danh mục, tải biểu mẫu/hồ sơ, đối chiếu phiên bản và trả dữ liệu cho quản trị.',role:'read'},
+  {key:'public',number:'03',title:'SmartForms Drive · Cổng phụ huynh',short:'Cổng phụ huynh',desc:'Danh mục công khai, tra cứu xác minh và tiếp nhận bản cập nhật từ phụ huynh.',role:'public'}
+ ];
+ const ACTION_ROLE={
+  driveSync:'write',driveHealth:'write',formUnregister:'write',driveDeleteForm:'write',driveDeleteApp:'write',
+  adminStatus:'write',adminLogin:'write',adminPasswordReset:'write',adminAccountSet:'write',bridgeHealth:'write',
+  driveList:'read',driveItem:'read',adminCatalog:'read',driveHas:'read',
+  publicCatalog:'public',publicForm:'public',publicWordTemplate:'public',publicHas:'public',publicLookup:'public',publicIdentitySearch:'public',publicUpload:'public',publicHealth:'public'
+ };
+ const FOLDER_ACTIONS=new Set(['publicCatalog','publicForm','publicWordTemplate','publicHas','publicLookup','publicIdentitySearch','publicUpload','driveList','driveItem','driveHas','driveHealth','adminCatalog']);
+ const DRIVE_ACTIONS=new Set([...Object.keys(ACTION_ROLE),'requestStatus','publicRequestStatus']);
+ const ROLE_ACTIONS={
+  write:{get:['publicHealth','publicCatalog','publicRequestStatus','adminStatus','publicLookup','publicForm','publicWordTemplate','publicHas','bridgeHealth','requestStatus','driveHealth','driveHas'],post:['publicUpload','publicIdentitySearch','adminLogin','adminPasswordReset','adminAccountSet','driveSync','formUnregister','driveDeleteForm','driveDeleteApp']},
+  read:{get:['publicHealth','publicCatalog','publicRequestStatus','publicLookup','publicForm','publicWordTemplate','publicHas','bridgeHealth','requestStatus','adminCatalog','driveHas','driveList','driveItem'],post:[]},
+  public:{get:['publicHealth','publicCatalog','publicRequestStatus','publicLookup','publicForm','publicWordTemplate','publicHas','bridgeHealth','requestStatus'],post:['publicUpload','publicIdentitySearch']}
+ };
+ const rawJsonp=window.jsonp,rawFetch=typeof window.fetch==='function'?window.fetch.bind(window):null;
+ let routingCache=null,routingPromise=null;
+ const pendingRoles=new Map();
+
+ function normalizeUrl(value){
+  const raw=text(value).trim().replace(/\/+$/,'');if(!raw)return'';
+  try{const u=new URL(raw);return u.protocol==='https:'&&u.hostname==='script.google.com'&&/^\/macros\/s\/[-\w]+\/exec$/i.test(u.pathname)?u.origin+u.pathname:''}catch{return''}
+ }
+ function normalizeFolder(value){
+  const raw=text(value).trim();if(!raw)return'';
+  const m=raw.match(/\/folders\/([-\w]{15,})/i)||raw.match(/[?&]id=([-\w]{15,})/i)||raw.match(/^([-\w]{15,})$/);if(!m)return'';
+  const key=raw.match(/[?&]resourcekey=([^&#]+)/i)?.[1]||'';return'https://drive.google.com/drive/folders/'+m[1]+(key?'?resourcekey='+encodeURIComponent(decodeURIComponent(key)):'' )
+ }
+ function locationFolder(){try{return new URL(location.href).searchParams.get('sf_folder')||''}catch{return''}}
+ function serviceRecord(raw,key,legacyUrl,legacyToken){
+  const item=raw?.[key]||{};
+  const ownUrl=normalizeUrl(item.appsScriptUrl||item.url||item.endpoint),ownToken=text(item.appsScriptToken||item.token).trim();
+  return{url:ownUrl&&ownToken?ownUrl:legacyUrl,token:ownUrl&&ownToken?ownToken:legacyToken,ownUrl,ownToken,explicit:!!(ownUrl&&ownToken)};
+ }
+ function normalizeDriveData(raw){
+  const d=raw||{},legacyUrl=normalizeUrl(d.appsScriptUrl||d.endpoint),legacyToken=text(d.appsScriptToken||d.token).trim(),rawServices=d.driveServices||{};
+  const services={};for(const module of MODULES)services[module.key]=serviceRecord(rawServices,module.key,legacyUrl,legacyToken);
+  return{...d,id:'drive',legacyUrl,legacyToken,appsScriptUrl:legacyUrl,appsScriptToken:legacyToken,publicSiteUrl:text(d.publicSiteUrl),folderUrl:normalizeFolder(d.folderUrl||Object.values(d.formFolders||{}).find(Boolean)||''),formFolders:{...(d.formFolders||{})},autoForms:d.autoForms!==false,autoApps:d.autoApps!==false,services};
+ }
+ async function routingData(){
+  if(routingCache)return routingCache;
+  if(routingPromise)return routingPromise;
+  routingPromise=(async()=>{let raw={};try{raw=await idbGet('settings','drive')||{}}catch{}routingCache=normalizeDriveData(raw);routingPromise=null;return routingCache})();
+  return routingPromise;
+ }
+ function invalidateRouting(){routingCache=null;routingPromise=null}
+ async function routeFor(action,fallback,params={}){
+  const data=await routingData(),forced=text(params.sfRole||''),pending=params.requestId?pendingRoles.get(text(params.requestId)):'';
+  const role=forced||pending||ACTION_ROLE[action]||'write',service=data.services[role]||data.services.write||{};
+  const fallbackUrl=normalizeUrl(fallback),url=service.url||fallbackUrl||data.legacyUrl,token=service.token||data.legacyToken||text(params.token).trim(),folder=data.folderUrl||locationFolder();
+  return{role,url,token,folder};
+ }
+
+ /* Định tuyến cả JSONP và POST. Các hàm cũ của website không cần sửa từng chỗ. */
+ if(typeof rawJsonp==='function'){
+  window.jsonp=async function(endpoint,params={},timeout=25000){
+   const action=text(params.action);if(!DRIVE_ACTIONS.has(action))return rawJsonp(endpoint,params,timeout);
+   const route=await routeFor(action,endpoint,params),next={...params};
+   if(route.token)next.token=route.token;
+   if(route.folder&&!next.folder&&FOLDER_ACTIONS.has(action))next.folder=route.folder;
+   const result=await rawJsonp(route.url||endpoint,next,timeout);
+   if((action==='requestStatus'||action==='publicRequestStatus')&&params.requestId&&!result?.pending)pendingRoles.delete(text(params.requestId));
+   return result;
+  };
+  try{jsonp=window.jsonp}catch{}
+ }
+ if(rawFetch){
+  window.fetch=async function(input,init={}){
+   let payload=null;try{if(typeof init.body==='string')payload=JSON.parse(init.body)}catch{}
+   if(!payload||!DRIVE_ACTIONS.has(text(payload.action)))return rawFetch(input,init);
+   const inputUrl=typeof input==='string'?input:(input?.url||''),route=await routeFor(payload.action,inputUrl,payload),nextPayload={...payload};
+   if(route.token)nextPayload.token=route.token;
+   if(route.folder&&!nextPayload.folder&&FOLDER_ACTIONS.has(text(payload.action)))nextPayload.folder=route.folder;
+   if(nextPayload.requestId)pendingRoles.set(text(nextPayload.requestId),route.role);
+   const nextInit={...init,body:JSON.stringify(nextPayload)};
+   return rawFetch(route.url||input,nextInit);
+  };
+ }
+
+ function buildDriveModuleCode(role){
+  let source=text(window.DRIVE_HIERARCHY_APPS_SCRIPT);
+  const roleHeader='/* ST SmartForms Drive module · '+role+' · mỗi dự án chỉ nhận nhóm tác vụ được cấp */\nconst SF_SERVICE_ROLE='+JSON.stringify(role)+';\nconst SF_ROLE_ACTIONS='+JSON.stringify(ROLE_ACTIONS)+';\nfunction sfRoleAllows_(method,action){if(SF_SERVICE_ROLE===\'all\')return true;const set=SF_ROLE_ACTIONS[SF_SERVICE_ROLE]||SF_ROLE_ACTIONS.write;return (set[method]||[]).indexOf(String(action||\'\'))>=0;}\n';
+  if(!source.includes('SF_SERVICE_ROLE')){
+   source=source.replace('function doPost(e){','function doPost(e){\n  let _sfProbe;try{_sfProbe=JSON.parse((e.postData&&e.postData.contents)||\'{}\')}catch(_sfErr){return ContentService.createTextOutput(\'invalid json\')}const _sfProbeId=requestId_(_sfProbe.requestId);if(!sfRoleAllows_(\'post\',_sfProbe.action))return requestText_(_sfProbeId,false,\'action not assigned to \'+SF_SERVICE_ROLE);');
+   source=source.replace('function doGet(e){','function doGet(e){\n  const _sfQ=e.parameter||{},_sfCb=/^[A-Za-z_$][\\w$.]*$/.test(_sfQ.callback||\'\')?_sfQ.callback:\'cb\';if(!sfRoleAllows_(\'get\',_sfQ.action))return jsonp_(_sfCb,{ok:false,error:\'action not assigned to \'+SF_SERVICE_ROLE});');
+  }
+  return roleHeader+source;
+ }
+
+ async function copy(value){
+  try{await navigator.clipboard.writeText(text(value));return true}catch{const area=document.createElement('textarea');area.value=text(value);area.style.cssText='position:fixed;left:-9999px;opacity:0';document.body.appendChild(area);area.select();let ok=false;try{ok=document.execCommand('copy')}catch{}area.remove();return ok}
+ }
+ function passRow(name,value,placeholder){return'<div class="sf22-pass"><input name="'+name+'" type="password" value="'+html(value)+'" placeholder="'+html(placeholder)+'" autocomplete="off" spellcheck="false"><button type="button" class="password-toggle" data-sf22-eye>Hiện</button></div>'}
+ function bindPass(root){qa('[data-sf22-eye]',root).forEach(button=>button.onclick=()=>{const input=button.previousElementSibling,show=input.type==='password';input.type=show?'text':'password';button.textContent=show?'Ẩn':'Hiện'})}
+ function box(id,message,kind=''){const target=q('#'+id);if(target)target.innerHTML=message?'<div class="notice'+(kind?' '+kind:'')+'">'+message+'</div>':''}
+ function busy(button,label){const old=button?.textContent||'';if(button){button.disabled=true;button.textContent=label}return()=>{if(button?.isConnected){button.disabled=false;button.textContent=old}}}
+ function moduleStatus(data,module){const item=data.services[module.key];if(item.explicit)return'<span class="badge ok">Đã cấu hình</span>';if(data.legacyUrl&&data.legacyToken)return'<span class="badge">Dùng Writer</span>';return'<span class="badge warn">Chưa cấu hình</span>'}
+
+ async function renderSystemMulti(){
+  const pane=q('#av-system');if(!pane)return;pane.classList.remove('hidden');
+  const gmail=await idbGet('settings','gmail_bridge_v1')||await idbGet('settings','gmail')||{},driveRaw=await idbGet('settings','drive')||{},drive=normalizeDriveData(driveRaw),gmailCode=text(window.GMAIL_BRIDGE_CODE),selected=MODULES[0];
+  const gmailUrl=normalizeUrl(gmail.appsScriptUrl||gmail.endpoint),driveReady=!!(drive.legacyUrl&&drive.legacyToken&&drive.folderUrl),sameUrl=gmailUrl&&drive.legacyUrl&&gmailUrl===drive.legacyUrl;
+  const rows=MODULES.map(module=>{const item=drive.services[module.key],shownUrl=item.explicitUrl||(module.key==='write'?drive.legacyUrl:'');return'<div class="sf22-module"><div class="sf22-module-head"><div><b>'+module.number+' · '+html(module.short)+'</b><small>'+html(module.desc)+'</small></div>'+moduleStatus(drive,module)+'</div><label>URL Web App /exec</label><input name="'+module.key+'Url" value="'+html(shownUrl)+'" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off"><label>SMARTFORMS_DRIVE_TOKEN</label>'+passRow(module.key+'Token',item.explicitToken||(module.key==='write'?drive.legacyToken:''),'Token riêng của dự án '+module.short)+'</div>'}).join('');
+  pane.innerHTML='<div class="sectionHead"><div><h2>Thiết lập hệ thống</h2><p>Hai khối chính được xếp thành <b>hai dòng riêng biệt</b> trên desktop, tablet và điện thoại. Gmail giữ một dự án riêng; SmartForms Drive được tách theo luồng ghi, đọc và phụ huynh.</p></div></div>'+(sameUrl?'<div class="notice bad" style="margin-bottom:14px">URL Gmail đang trùng URL SmartForms Drive. Hãy dùng hai dự án Apps Script khác nhau.</div>':'')+'<div class="sf22-grid">'+
+   '<section class="card panel sf22-card"><div class="sf22-head"><span class="sf22-num">01</span><div><h3>SmartForms Gmail</h3><p>Tạo bản nháp Gmail kèm PDF hồ sơ và theo dõi trạng thái Boomerang.</p></div><span class="badge '+(gmailUrl&&gmail.appsScriptToken?'ok':'warn')+'">'+(gmailUrl&&gmail.appsScriptToken?'Đã cấu hình':'Chưa cấu hình')+'</span></div>'+
+   '<ol class="sf22-steps"><li>Tạo dự án <b>SmartForms Gmail</b> riêng.</li><li>Dán mã <b>SF_Gmail.gs</b>, chạy <b>setupSmartFormsGmail</b> và cấp quyền.</li><li>Deploy Web App với <b>Execute as Me · Anyone</b>, sau đó dán URL/token.</li></ol>'+
+   '<form id="sf22GmailForm" class="formgrid"><div class="field full"><label>URL Web App Gmail (/exec)</label><input name="url" value="'+html(gmailUrl)+'" placeholder="https://script.google.com/macros/s/.../exec"></div><div class="field full"><label>SMARTFORMS_GMAIL_TOKEN</label>'+passRow('token',text(gmail.appsScriptToken),'Token trong Nhật ký thực thi')+'</div><div class="field full sf22-actions"><button class="btn primary" type="submit">Lưu &amp; kiểm tra Gmail</button><button class="btn ghost" type="button" id="sf22GmailTest">Chỉ kiểm tra</button></div></form><div id="sf22GmailBox"></div><div class="sf22-code"><div class="sf22-codebar"><b>SF_Gmail.gs</b><span id="sf22GmailSize" class="field-hint"></span><button class="btn secondary" id="sf22CopyGmail" type="button">Sao chép mã Gmail</button></div><textarea id="sf22GmailCode" readonly spellcheck="false"></textarea></div></section>'+
+   '<section class="card panel sf22-card"><div class="sf22-head"><span class="sf22-num">02</span><div><h3>SmartForms Drive</h3><p>Ba dự án dùng chung một thư mục mẹ. Tài khoản quản trị và recovery vẫn nằm ở dự án <b>Ghi &amp; tài khoản</b> để dữ liệu xác minh không bị tách rời.</p></div><span class="badge '+(driveReady?'ok':'warn')+'">'+(driveReady?'Đã cấu hình':'Chưa cấu hình')+'</span></div>'+
+   '<ol class="sf22-steps"><li>Tạo ba dự án: <b>SmartForms Drive - Write</b>, <b>Read</b> và <b>Public</b>.</li><li>Trong ô chọn mã bên dưới, sao chép đúng mã của từng vai trò vào đúng dự án.</li><li>Ở mỗi dự án chạy <b>setupSmartFormsDrive</b>, cấp quyền Drive và Deploy <b>Me · Anyone</b>.</li><li>Dùng cùng thư mục mẹ; không dùng chung URL/token giữa các dự án.</li><li>Nếu chưa nhập Read/Public, hệ thống tự dùng Writer cũ để giữ tương thích.</li></ol>'+
+   '<form id="sf22DriveForm" class="formgrid"><div class="field full"><label>Thư mục mẹ Google Drive</label><input name="folder" value="'+html(drive.folderUrl)+'" placeholder="https://drive.google.com/drive/folders/..." required></div><div class="field full"><label>Website chính thức của nhà trường</label><input name="site" value="'+html(drive.publicSiteUrl)+'" placeholder="https://ten-truong.github.io/ten-du-an/"></div><div class="field full"><div class="sf22-module-grid">'+rows+'</div></div><div class="field full sf22-actions"><button class="btn primary" type="submit">Lưu &amp; kiểm tra SmartForms Drive</button><button class="btn ghost" type="button" id="sf22DriveSync">Đồng bộ song song</button><button class="btn ghost" type="button" id="sf22DrivePull">Lấy dữ liệu về</button></div></form><div id="sf22DriveBox"></div>'+
+   '<div class="sf22-code"><div class="sf22-codebar"><label for="sf22CodeRole"><b>Mã dự án cần sao chép</b></label><select id="sf22CodeRole">'+MODULES.map(m=>'<option value="'+m.key+'">'+m.number+' · '+html(m.short)+'</option>').join('')+'</select><span id="sf22DriveSize" class="field-hint"></span><button class="btn secondary" id="sf22CopyDrive" type="button">Sao chép mã</button></div><textarea id="sf22DriveCode" readonly spellcheck="false"></textarea><div class="field-hint">Đây là mã đầy đủ có bộ lọc vai trò. Mỗi dự án chỉ nhận các action của vai trò đã chọn; phần dữ liệu dùng chung được đọc từ metadata trong Drive để Read/Public không phụ thuộc Script Properties của Writer.</div></div></section></div>'+
+   '<div class="setup-guide sf22-foot"><b>Nguyên tắc vận hành:</b> Write xử lý ghi và tài khoản, Read xử lý lấy dữ liệu, Public xử lý truy cập phụ huynh. Việc tách này giảm tranh chấp hàng đợi; tốc độ thực tế còn phụ thuộc hạn mức Google Apps Script, dung lượng tệp và số lượt đồng thời.</div>';
+
+  bindPass(pane);
+  const copyG=q('#sf22CopyGmail'),copyD=q('#sf22CopyDrive'),gCode=q('#sf22GmailCode');gCode.value=gmailCode||'// Không tải được mã Gmail.';q('#sf22GmailSize').textContent=gmailCode.split('\n').length+' dòng';
+  copyG.onclick=async()=>{copyG.textContent=await copy(gmailCode)?'Đã sao chép ✓':'Không sao chép được';setTimeout(()=>{if(copyG.isConnected)copyG.textContent='Sao chép mã Gmail'},1600)};
+  const codeArea=q('#sf22DriveCode'),roleSelect=q('#sf22CodeRole');
+  const refreshCode=()=>{const value=buildDriveModuleCode(roleSelect.value);codeArea.value=value;q('#sf22DriveSize').textContent=value.split('\n').length+' dòng'};
+  roleSelect.onchange=refreshCode;refreshCode();copyD.onclick=async()=>{copyD.textContent=await copy(codeArea.value)?'Đã sao chép ✓':'Không sao chép được';setTimeout(()=>{if(copyD.isConnected)copyD.textContent='Sao chép mã'},1600)};
+
+  q('#sf22GmailForm').onsubmit=async event=>{event.preventDefault();const form=event.currentTarget,done=busy(event.submitter,'Đang kiểm tra…');try{const url=normalizeUrl(form.url.value),token=form.token.value.trim();if(!url)throw new Error('URL Gmail chưa đúng.');if(!token)throw new Error('Chưa nhập SMARTFORMS_GMAIL_TOKEN.');if(url===drive.legacyUrl)throw new Error('URL này đang là dự án Drive. Gmail phải dùng dự án riêng.');if(window.sfGmailBridge?.save)await window.sfGmailBridge.save({appsScriptUrl:url,appsScriptToken:token});else await idbPut('settings',{...(await idbGet('settings','gmail_bridge_v1')||{}),id:'gmail_bridge_v1',appsScriptUrl:url,appsScriptToken:token});box('sf22GmailBox','Đã lưu cấu hình Gmail.','ok')}catch(error){box('sf22GmailBox',html(error?.message||error),'bad')}finally{done()}};
+  q('#sf22GmailTest').onclick=async event=>{const done=busy(event.currentTarget,'Đang kiểm tra…');try{if(!window.sfGmailBridge?.health)throw new Error('Chưa tải được mô-đun Gmail.');const result=await window.sfGmailBridge.health();box('sf22GmailBox','<b>Gmail đã kết nối.</b>'+(result?.email?' Tài khoản: <b>'+html(result.email)+'</b>.':''),'ok')}catch(error){box('sf22GmailBox',html(error?.message||error),'bad')}finally{done()}};
+  q('#sf22DriveForm').onsubmit=async event=>{event.preventDefault();const form=event.currentTarget,done=busy(event.submitter,'Đang lưu…');try{const folder=normalizeFolder(form.folder.value),site=text(form.site.value).trim(),services={};for(const module of MODULES){const url=normalizeUrl(form.elements[module.key+'Url'].value),token=text(form.elements[module.key+'Token'].value).trim();if((url&&!token)||(!url&&token))throw new Error('Mô-đun '+module.short+' phải có đủ URL và token, hoặc để trống cả hai ô.');services[module.key]={appsScriptUrl:url,appsScriptToken:token}}const writer=services.write,current=await idbGet('settings','drive')||{},legacyUrl=writer.appsScriptUrl||normalizeUrl(current.appsScriptUrl||current.endpoint),legacyToken=writer.appsScriptToken||text(current.appsScriptToken||current.token);if(!legacyUrl||!legacyToken)throw new Error('Hãy cấu hình ít nhất dự án Ghi & tài khoản.');const next={...current,id:'drive',appsScriptUrl:legacyUrl,appsScriptToken:legacyToken,folderUrl:folder,publicSiteUrl:site,autoForms:current.autoForms!==false,autoApps:current.autoApps!==false,driveServices:services};await idbPut('settings',next);for(const item of await idbAll('forms')){if(item.driveFolderUrl!==folder){item.driveFolderUrl=folder;await idbPut('forms',item)}}invalidateRouting();box('sf22DriveBox','Đã lưu ba luồng. Đang kiểm tra quyền ghi của Writer…');const check=window.driveHierarchyHealth;if(typeof check!=='function')throw new Error('Chưa tải được hàm kiểm tra Drive.');const result=await check(folder,{force:true});box('sf22DriveBox','<b>SmartForms Drive đã kết nối.</b>'+(result?.folderName?' Thư mục: <b>'+html(result.folderName)+'</b>.':'')+' Các action đọc/ phụ huynh sẽ được định tuyến sang URL riêng nếu đã nhập.','ok')}catch(error){box('sf22DriveBox',html(error?.message||error),'bad')}finally{done()}};
+  q('#sf22DriveSync').onclick=async event=>{const done=busy(event.currentTarget,'Đang đồng bộ…');try{box('sf22DriveBox','Đang đồng bộ song song các mục…');await window.syncAllDriveHierarchy();box('sf22DriveBox','Đã đồng bộ xong các mục qua luồng Ghi.','ok')}catch(error){box('sf22DriveBox',html(error?.message||error),'bad')}finally{done()}};
+  q('#sf22DrivePull').onclick=async event=>{const done=busy(event.currentTarget,'Đang lấy…');try{const pull=window.pullDriveHierarchy||window.pullAllV4;if(typeof pull!=='function')throw new Error('Chưa tải được hàm lấy dữ liệu Drive.');const result=await pull();box('sf22DriveBox','Đã lấy dữ liệu mới nhất từ Drive'+(result?.restoredApps!==undefined?': '+html(result.restoredApps)+' hồ sơ, '+html(result.restoredForms)+' biểu mẫu':'')+'.','ok')}catch(error){box('sf22DriveBox',html(error?.message||error),'bad')}finally{done()}};
+ }
+
+ async function syncAllParallel(){
+  const forms=await idbAll('forms'),apps=await idbAll('apps'),targets=[...forms.map(item=>({kind:'form',item})),...apps.map(item=>({kind:'app',item}))],total=targets.length,progress=q('#sf22DriveBox')||q('#driveProgress');
+  if(!total){if(progress)progress.innerHTML='<div class="notice warn">Chưa có dữ liệu để đồng bộ.</div>';return{done:0,total:0,errors:[]}}
+  let cursor=0,done=0,errors=[];const worker=async()=>{while(true){const index=cursor++;if(index>=targets.length)return;const target=targets[index];try{if(target.kind==='form')await window.syncFormToDrive(target.item,true,true,true);else await window.syncAppToDrive(target.item,true,true,true)}catch(error){errors.push(error)}done++;if(progress)progress.innerHTML='<div class="notice">Đang đồng bộ '+done+'/'+total+' mục qua tối đa 4 luồng…</div>'}};
+  await Promise.all(Array.from({length:Math.min(4,total)},worker));
+  if(progress)progress.innerHTML=errors.length?'<div class="notice bad"><b>'+errors.length+' mục chưa đồng bộ:</b><br>'+errors.map(error=>html(window.driveHierarchyError?.(error)||error?.message||error)).join('<br>')+'</div>':'<div class="notice ok">Đã đồng bộ '+done+'/'+total+' mục.</div>';
+  return{done,total,errors};
+ }
+ if(typeof window.syncAllDriveHierarchy==='function'){window.syncAllDriveHierarchy=syncAllParallel;try{syncAllDriveHierarchy=syncAllParallel}catch{}window.syncAll=syncAllParallel;window.syncAllReliable=syncAllParallel}
+
+ function installStyles(){
+  if(q('#sf22Style'))return;
+  const style=document.createElement('style');style.id='sf22Style';style.textContent=`
+   /* Hai khối cấp cao luôn xếp thành hai dòng ở cả ba kích thước thiết bị. */
+   #av-system .sf20-grid,#av-system .sf22-grid{display:grid!important;grid-template-columns:minmax(0,1fr)!important;grid-auto-flow:row;gap:16px;align-items:start}
+   #av-system .sf22-card{min-width:0;display:flex;flex-direction:column;gap:13px}
+   #av-system .sf22-head{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:start}
+   #av-system .sf22-head h3{margin:0 0 4px;color:#123f59;font-size:1.12rem}
+   #av-system .sf22-head p{margin:0;color:#687b8b;font-size:.87rem;line-height:1.55}
+   #av-system .sf22-num{width:39px;height:39px;display:grid;place-items:center;border-radius:12px;background:#e7f1f5;color:#0d5e78;font-weight:950}
+   #av-system .sf22-steps{margin:0;padding:12px 15px 12px 33px;border:1px solid #dfe9ee;border-radius:13px;background:#f6f9fb;color:#4d6072;font-size:.86rem;line-height:1.62}
+   #av-system .sf22-steps li+li{margin-top:3px}
+   #av-system .sf22-actions{display:flex;gap:8px;flex-wrap:wrap}
+   #av-system .sf22-pass{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px;align-items:center}
+   #av-system .sf22-pass .password-toggle{min-height:42px;padding:8px 12px;border:1px solid #ccdce6;border-radius:11px;background:#f5f8fa;color:#476173;font-weight:800}
+   #av-system .sf22-module-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+   #av-system .sf22-module{min-width:0;padding:13px;border:1px solid #d8e6eb;border-radius:14px;background:#fbfdfe}
+   #av-system .sf22-module-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:10px}
+   #av-system .sf22-module-head b{display:block;color:#164b62;font-size:.92rem}
+   #av-system .sf22-module-head small{display:block;margin-top:4px;color:#6b7c8c;font-size:.75rem;line-height:1.45}
+   #av-system .sf22-module>label{display:block;margin:8px 0 4px;color:#5b6d7c;font-size:11px;font-weight:850}
+   #av-system .sf22-code{min-width:0;border:1px solid #d7e4e9;border-radius:13px;background:#fbfdfe;padding:10px}
+   #av-system .sf22-codebar{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+   #av-system .sf22-codebar select{width:auto;min-width:170px;padding:8px 10px}
+   #av-system .sf22-codebar .field-hint{margin:0;flex:1 1 70px}
+   #av-system .sf22-code textarea{width:100%;height:300px;min-height:190px;resize:vertical;font:11px/1.45 Consolas,Monaco,monospace;white-space:pre;overflow:auto;background:#fff}
+   #av-system .sf22-foot{margin-top:0}
+   @media(max-width:1040px){#av-system .sf22-module-grid{grid-template-columns:1fr}}
+   @media(max-width:620px){#av-system .sf22-head{grid-template-columns:auto minmax(0,1fr)}#av-system .sf22-head .badge{grid-column:2;justify-self:start}#av-system .sf22-actions .btn{flex:1;min-width:145px}#av-system .sf22-codebar .btn{width:100%}}
+  `;document.head.appendChild(style)
+ }
+ window.sf22RenderSystem=renderSystemMulti;window.sf20RenderSystem=renderSystemMulti;window.renderSystemSetup=renderSystemMulti;window.sf22BuildDriveModuleCode=buildDriveModuleCode;
+ function boot(){installStyles();if(q('#av-system:not(.hidden)'))renderSystemMulti().catch(error=>console.warn('SmartForms 22',error))}
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
+})();
+/* ===== Kết thúc SmartForms 22.0 ===== */
+
+/* ===== SmartForms 23.0 · Chọn nhiều hồ sơ để xóa (website + Drive) · Tự cập nhật hồ sơ từ Drive =====
+   1. Mỗi thẻ hồ sơ có ô chọn; có "Chọn tất cả đang hiển thị" và "Chọn cả nhóm biểu mẫu".
+   2. Xóa 1 hoặc nhiều hồ sơ: chuyển thư mục hồ sơ trên Drive vào Thùng rác rồi gỡ khỏi website.
+      Hồ sơ đã xóa được ghi "dấu xóa" để không bị kéo ngược về từ Drive; nếu Drive lỗi, hệ thống tự thử xóa lại.
+   3. Trang quản trị tự đối chiếu Drive: hồ sơ mới, bản phụ huynh cập nhật, trạng thái đổi ở máy khác,
+      hồ sơ bị xóa ở máy khác đều được cập nhật về, không cần bấm tay.
+   Dùng lại action Apps Script sẵn có (driveList, driveItem, driveDeleteApp) nên KHÔNG cần triển khai lại Apps Script.
+*/
+(function installSmartForms23(){
+ 'use strict';
+ if(window.__sf23Installed)return;
+ window.__sf23Installed=true;
+
+ const CFG={
+  TICK:15000,              // chu kỳ kiểm tra Drive khi đang mở trang quản trị
+  FRESH_EVERY:3,           // cứ 3 lượt thì đọc danh sách mới hoàn toàn (bỏ qua cache Apps Script)
+  DOWNLOAD_POOL:3,         // số hồ sơ tải song song
+  DELETE_POOL:2,           // số hồ sơ xóa song song trên Drive
+  REMOVE_GRACE:3*60*1000,  // hồ sơ vừa sửa trong 3 phút sẽ không bị gỡ theo Drive
+  RETRY_DELETE_GAP:5*60*1000,
+  TOMB_DAYS:30,
+  TOMB_ID:'sf23_tombstones'
+ };
+ const q=(s,r=document)=>r.querySelector(s),qa=(s,r=document)=>[...r.querySelectorAll(s)];
+ const text=v=>String(v??'');
+ const h=v=>typeof esc==='function'?esc(v):text(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+ const DONE_DRIVE='Đã chuyển lên Drive';
+
+ /* ---------- Dấu xóa: chặn hồ sơ đã xóa bị nhập lại từ Drive ---------- */
+ const tomb=new Map();
+ let tombLoaded=false;
+ async function loadTomb(){
+  try{
+   const rec=await idbGet('settings',CFG.TOMB_ID),limit=Date.now()-CFG.TOMB_DAYS*864e5;
+   for(const [id,at] of Object.entries(rec?.items||{}))if(Number(at)>limit)tomb.set(id,Number(at));
+  }catch{}
+  tombLoaded=true;
+ }
+ async function saveTomb(){
+  try{await idbPutRaw('settings',{id:CFG.TOMB_ID,items:Object.fromEntries(tomb)})}catch{}
+ }
+ async function addTomb(id){tomb.set(text(id),Date.now());await saveTomb()}
+
+ const idbPutRaw=idbPut;
+ idbPut=async function(store,value){
+  if(store==='apps'&&value&&tomb.has(text(value.id)))return value;
+  return idbPutRaw(store,value);
+ };
+ try{window.idbPut=idbPut}catch{}
+
+ /* ---------- Cấu hình Drive (đi qua bộ định tuyến Write/Read của bản 22) ---------- */
+ function normUrl(v){const raw=text(v).trim().replace(/\/+$/,'');return /^https:\/\/script\.google\.com\/macros\/s\/[-\w]+\/exec$/i.test(raw)?raw:''}
+ async function driveCfg(){
+  try{
+   const d=(await idbGet('settings','drive'))||{},s=d.driveServices||{};
+   const endpoint=normUrl(d.appsScriptUrl)||normUrl(s.write?.appsScriptUrl||s.write?.url)||normUrl(s.read?.appsScriptUrl||s.read?.url);
+   const token=text(d.appsScriptToken||s.write?.appsScriptToken||s.write?.token||s.read?.appsScriptToken||s.read?.token).trim();
+   const folder=text(d.folderUrl)||Object.values(d.formFolders||{}).filter(Boolean)[0]||'';
+   if(!endpoint||!token||!folder)return null;
+   return{endpoint,token,folder};
+  }catch{return null}
+ }
+ const J=(endpoint,params,timeout)=>(window.jsonp||jsonp)(endpoint,params,timeout);
+
+ async function postConfirmed(cfg,payload,timeout=90000){
+  const requestId='sf23_'+Date.now().toString(36)+Math.random().toString(36).slice(2,9),started=Date.now();
+  try{
+   await window.fetch(cfg.endpoint,{method:'POST',mode:'no-cors',cache:'no-store',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({...payload,token:cfg.token,requestId})});
+  }catch{throw new Error('Không gửi được yêu cầu tới Apps Script.')}
+  let attempt=0,last='';
+  while(Date.now()-started<timeout){
+   await sleep(Math.min(450+attempt*450,2200));attempt++;
+   try{
+    const r=await J(cfg.endpoint,{action:'requestStatus',token:cfg.token,requestId},25000);
+    if(!r||!r.ok)throw new Error(r?.error||'Không đọc được trạng thái Apps Script.');
+    if(r.pending)continue;
+    if(r.result&&r.result.ok)return r.result;
+    throw new Error(r.result?.message||'Apps Script từ chối yêu cầu.');
+   }catch(error){
+    const m=text(error?.message||error);
+    if(/từ chối|unauthorized|permission|invalid action|not allowed|không hợp lệ/i.test(m))throw error;
+    last=m;
+   }
+  }
+  throw new Error(last||'Apps Script chưa xác nhận đã xóa. Hãy kiểm tra lại trên Drive.');
+ }
+ function deleteOnDrive(cfg,app){
+  return postConfirmed(cfg,{action:'driveDeleteApp',folder:cfg.folder,formId:text(app.formId),itemKey:text(app.id),code:text(app.code)});
+ }
+
+ /* ---------- Trạng thái chọn ---------- */
+ const selected=new Set();
+ let bulkRunning=false;
+ /* SF24: chế độ xóa + tạm dừng cập nhật */
+ let delMode=false,lastLive={msg:'Tự cập nhật từ Drive',kind:''};
+ let paused=false;try{paused=localStorage.getItem('sf24_paused')==='1'}catch{}
+ window.sfAutoSyncPaused=paused;
+
+ function isParent(){try{return !!(window.isParentPortal&&window.isParentPortal())}catch{return false}}
+ function adminActive(){
+  try{return !!state.admin&&!isParent()&&!document.hidden&&navigator.onLine!==false&&!!q('#adminApp:not(.hidden)')}catch{return false}
+ }
+ const recordsVisible=()=>!!q('#av-records:not(.hidden)');
+ const modalOpen=()=>!!(q('#modal:not(.hidden)')||q('#workspace:not(.hidden)'));
+
+ function cardId(card){
+  if(card.dataset.sf23Id)return card.dataset.sf23Id;
+  for(const b of qa('button',card)){
+   const m=(b.getAttribute('onclick')||'').match(/viewApp\(\s*'([^']+)'/);
+   if(m){card.dataset.sf23Id=m[1];return m[1]}
+  }
+  return'';
+ }
+ function setText(el,value){if(el&&el.textContent!==value)el.textContent=value}
+
+ /* ---------- Gắn giao diện chọn + thanh công cụ ---------- */
+ function decorate(){
+  const list=q('#recList');if(!list)return;
+  let bar=q('#sf23Bar');
+  if(!bar){
+   bar=document.createElement('div');bar.id='sf23Bar';bar.className='sf23-bar';bar.dataset.sf23Keep='1';
+   bar.innerHTML='<label class="sf23-all"><input type="checkbox" id="sf23All"><span>Chọn tất cả đang hiển thị</span></label>'+
+    '<span class="sf23-count" id="sf23Count">Chưa chọn hồ sơ nào</span>'+
+    '<button type="button" class="btn ghost" id="sf23Clear">Bỏ chọn</button>'+
+    '<button type="button" class="btn danger" id="sf23Delete" disabled>🗑 Xóa đã chọn</button>';
+   list.insertAdjacentElement('beforebegin',bar);
+   q('#sf23All').onchange=e=>{for(const card of qa('#recList .student-card')){const id=cardId(card);if(!id)continue;e.target.checked?selected.add(id):selected.delete(id)}paint()};
+   q('#sf23Clear').onclick=()=>{selected.clear();paint()};
+   q('#sf23Delete').onclick=()=>bulkDelete();
+  }
+  installHeaderControls();
+  installDeleteToggle();
+  loadLocks().catch(()=>{});
+  for(const card of qa('#recList .student-card')){
+   const id=cardId(card);if(!id||q('.sf23-pick',card))continue;
+   const head=q('.student-card-head',card)||card;
+   const label=document.createElement('label');label.className='sf23-pick';label.title='Chọn hồ sơ này';
+   label.innerHTML='<input type="checkbox" data-sf23-pick="'+h(id)+'">';
+   head.insertAdjacentElement('afterbegin',label);
+   q('input',label).onchange=e=>{e.target.checked?selected.add(id):selected.delete(id);paint()};
+  }
+  for(const group of qa('#recList details.record-parent')){
+   if(q(':scope > .sf23-group',group))continue;
+   const summary=q(':scope > summary',group);if(!summary)continue;
+   const row=document.createElement('label');row.className='sf23-group';
+   row.innerHTML='<input type="checkbox"><span>Chọn cả nhóm biểu mẫu này</span>';
+   summary.insertAdjacentElement('afterend',row);
+   q('input',row).onchange=e=>{for(const card of qa('.student-card',group)){const id=cardId(card);if(id)e.target.checked?selected.add(id):selected.delete(id)}paint()};
+  }
+  paint();
+ }
+ /* ---------- SF24: KHÓA / MỞ KHÓA theo 3 URL Drive ----------
+    Ghi dữ liệu   → chức năng Xóa
+    Đọc dữ liệu   → Tự cập nhật, Tạm dừng/Tiếp tục, Tải cập nhật
+    Cổng phụ huynh→ phụ huynh nộp/tra cứu hồ sơ
+    Đủ 3 URL + thư mục Drive → mở khóa toàn bộ. */
+ let locks={write:false,read:false,public:false,folder:false,all:false,known:false};
+ const LOCK_NAME={write:'URL Ghi dữ liệu',read:'URL Đọc dữ liệu',public:'URL Cổng phụ huynh',folder:'link thư mục Drive'};
+ async function loadLocks(){
+  const next={write:false,read:false,public:false,folder:false,known:true};
+  try{
+   const d=(await idbGet('settings','drive'))||{},s=d.driveServices||{};
+   const own=k=>!!(normUrl(s[k]?.appsScriptUrl||s[k]?.url)&&text(s[k]?.appsScriptToken||s[k]?.token).trim());
+   const legacy=!!(normUrl(d.appsScriptUrl||d.endpoint)&&text(d.appsScriptToken||d.token).trim());
+   /* Đã dùng Thiết lập 3 dự án (bản 22) → xét đúng từng ô. Cấu hình cũ 1 dự án gộp → 1 URL dùng cho cả 3. */
+   const multi=Object.keys(s).length>0;
+   next.write=multi?own('write'):legacy;next.read=multi?own('read'):legacy;next.public=multi?own('public'):legacy;
+   next.folder=!!(text(d.folderUrl)||Object.values(d.formFolders||{}).find(Boolean));
+  }catch{}
+  next.all=next.write&&next.read&&next.public&&next.folder;
+  locks=next;window.sfDriveLocks=locks;
+  if(delMode&&!(locks.write&&locks.folder)){delMode=false;selected.clear()}
+  paintLocks();
+  return locks;
+ }
+ const canDelete=()=>locks.write&&locks.folder;
+ const canRead=()=>locks.read&&locks.folder;
+ function readLockMsg(){return'Tạm khóa · thiếu '+[!locks.read&&LOCK_NAME.read,!locks.folder&&LOCK_NAME.folder].filter(Boolean).join(', ')}
+ function paintLocks(){
+  const svc=q('#sf24Svc');
+  if(svc){
+   let html;
+   if(!locks.known)html='<b class="sf24-svc-title">Đang kiểm tra cấu hình Drive…</b>';
+   else{
+    const chip=(ok,label,need)=>'<span class="sf24-chip '+(ok?'on':'off')+'" title="'+(ok?'Đã mở khóa':'Tạm khóa · cần '+need)+'">'+(ok?'🔓':'🔒')+' '+label+'</span>';
+    const missing=['write','read','public','folder'].filter(k=>!locks[k]).map(k=>LOCK_NAME[k]);
+    html=(locks.all?'<b class="sf24-svc-title ok">🔓 Đã mở khóa đầy đủ chức năng Drive</b>':'<b class="sf24-svc-title warn">🔒 Tạm khóa một số chức năng · còn thiếu: '+missing.join(', ')+'</b>')+
+     chip(locks.write,'Ghi · Xóa hồ sơ',LOCK_NAME.write)+chip(locks.read,'Đọc · Tự cập nhật',LOCK_NAME.read)+chip(locks.public,'Cổng phụ huynh',LOCK_NAME.public)+chip(locks.folder,'Thư mục Drive',LOCK_NAME.folder)+
+     (locks.all?'':'<button type="button" class="btn ghost" id="sf24OpenSetup">Mở Thiết lập hệ thống</button>');
+   }
+   if(svc.dataset.sig!==html){svc.dataset.sig=html;svc.innerHTML=html;const b=q('#sf24OpenSetup');if(b)b.onclick=()=>{try{(window.showAdminView||showAdminView)('system')}catch{}}}
+  }
+  applyDelMode();paintPause();
+  if(locks.known&&!canRead())liveText(readLockMsg(),'lock');
+  else if(/^Tạm khóa|^Chưa có link|^Đang kiểm tra cấu hình/.test(lastLive.msg))liveText(paused?'Đã tạm dừng tự cập nhật':'Tự cập nhật từ Drive',paused?'warn':'');
+ }
+
+ /* ---------- SF24: nút Mở/Đóng chức năng xóa (cạnh bộ lọc trạng thái) ---------- */
+ function installDeleteToggle(){
+  const filter=q('#recStatus');if(!filter)return;
+  let btn=q('#sf24DelToggle');
+  if(!btn){
+   btn=document.createElement('button');btn.type='button';btn.id='sf24DelToggle';btn.dataset.sf23Keep='1';
+   btn.onclick=()=>setDelMode(!delMode);
+   filter.insertAdjacentElement('afterend',btn);
+  }
+  applyDelMode();
+ }
+ function setDelMode(on){
+  if(bulkRunning)return;
+  if(on&&!canDelete())return alert('Chức năng xóa đang TẠM KHÓA.\nCòn thiếu: '+[!locks.write&&LOCK_NAME.write,!locks.folder&&LOCK_NAME.folder].filter(Boolean).join(', ')+'.\n\nVào Thiết lập hệ thống để nhập đủ, chức năng sẽ tự mở khóa.');
+  delMode=!!on;
+  if(!delMode)selected.clear();
+  applyDelMode();paint();
+ }
+ function applyDelMode(){
+  const pane=q('#av-records');if(pane&&pane.classList.contains('sf24-del-on')!==delMode)pane.classList.toggle('sf24-del-on',delMode);
+  const btn=q('#sf24DelToggle');if(!btn)return;
+  const locked=!canDelete();
+  const cls='btn '+(locked?'ghost sf24-locked':delMode?'secondary':'danger');
+  if(btn.className!==cls)btn.className=cls; /* tránh vòng lặp MutationObserver */
+  setText(btn,locked?'🔒 Xóa · tạm khóa':delMode?'✕ Đóng chức năng xóa':'🗑 Mở chức năng xóa');
+  const tip=locked?'Tạm khóa · cần '+[!locks.write&&LOCK_NAME.write,!locks.folder&&LOCK_NAME.folder].filter(Boolean).join(', '):'';if(btn.title!==tip)btn.title=tip;
+  const pressed=delMode?'true':'false';if(btn.getAttribute('aria-pressed')!==pressed)btn.setAttribute('aria-pressed',pressed);
+ }
+
+ /* ---------- SF24: Tạm dừng/Tiếp tục + trạng thái + Tải cập nhật (thay 2 nút cũ) ---------- */
+ function installHeaderControls(){
+  const head=q('#av-records .sectionHead');if(!head||q('#sf24Head'))return;
+  let actions=q(':scope > .actions',head);
+  if(!actions){actions=document.createElement('div');actions.className='actions';head.appendChild(actions)}
+  const box=document.createElement('div');box.id='sf24Head';box.className='sf24-head';box.dataset.sf23Keep='1';
+  box.innerHTML='<div class="sf24-svc" id="sf24Svc"></div>'+
+   '<button type="button" class="btn secondary" id="sf24Pause"></button>'+
+   '<span class="sf23-live"><span class="sf23-dot" id="sf23Dot"></span><span id="sf23LiveText"></span></span>'+
+   '<button type="button" class="btn primary" id="sf23SyncNow">⟳ Tải cập nhật</button>';
+  actions.appendChild(box);
+  q('#sf24Pause').onclick=()=>setPaused(!paused);
+  q('#sf23SyncNow').onclick=()=>syncFromDrive({fresh:true,manual:true});
+  liveText(lastLive.msg,lastLive.kind);
+  paintLocks();
+ }
+ function paintPause(){
+  const b=q('#sf24Pause'),sync=q('#sf23SyncNow'),locked=!canRead();
+  if(sync&&!syncing){if(sync.disabled!==locked)sync.disabled=locked;setText(sync,locked?'🔒 Tải cập nhật':'⟳ Tải cập nhật');const t=locked?readLockMsg():'';if(sync.title!==t)sync.title=t}
+  if(!b)return;
+  if(b.disabled!==locked)b.disabled=locked;
+  setText(b,locked?'🔒 Cập nhật · tạm khóa':paused?'▶ Tiếp tục cập nhật':'⏸ Tạm dừng cập nhật');
+  const tip=locked?readLockMsg():paused?'Bật lại tự cập nhật hồ sơ từ Drive':'Tạm ngừng tự cập nhật hồ sơ từ Drive';if(b.title!==tip)b.title=tip;
+ }
+ function setPaused(v){
+  if(!canRead())return;
+  paused=!!v;window.sfAutoSyncPaused=paused;
+  try{localStorage.setItem('sf24_paused',paused?'1':'0')}catch{}
+  paintPause();
+  if(paused)liveText('Đã tạm dừng tự cập nhật','warn');
+  else{liveText('Đã bật lại tự cập nhật…','busy');syncFromDrive({fresh:true}).catch(()=>{})}
+ }
+
+ function paint(){
+  const cards=qa('#recList .student-card'),visible=cards.map(cardId).filter(Boolean);
+  for(const card of cards){
+   const id=cardId(card),on=selected.has(id),box=q('[data-sf23-pick]',card);
+   if(box&&box.checked!==on)box.checked=on;
+   card.classList.toggle('sf23-selected',on);
+  }
+  for(const group of qa('#recList details.record-parent')){
+   const ids=qa('.student-card',group).map(cardId).filter(Boolean),box=q(':scope > .sf23-group input',group);
+   if(!box)continue;const n=ids.filter(id=>selected.has(id)).length;
+   box.checked=!!ids.length&&n===ids.length;box.indeterminate=n>0&&n<ids.length;
+  }
+  const all=q('#sf23All');
+  if(all){const n=visible.filter(id=>selected.has(id)).length;all.checked=!!visible.length&&n===visible.length;all.indeterminate=n>0&&n<visible.length}
+  const count=selected.size;
+  setText(q('#sf23Count'),count?`Đã chọn ${count} hồ sơ`:'Chưa chọn hồ sơ nào');
+  const del=q('#sf23Delete');
+  if(del){del.disabled=!count||bulkRunning;setText(del,bulkRunning?'Đang xóa…':count?`🗑 Xóa ${count} hồ sơ đã chọn`:'🗑 Xóa đã chọn')}
+ }
+
+ /* ---------- Xóa nhiều hồ sơ ---------- */
+ async function bulkDelete(){
+  if(bulkRunning)return;
+  if(!(await loadLocks()).write||!locks.folder)return alert('Chức năng xóa đang tạm khóa: còn thiếu '+[!locks.write&&LOCK_NAME.write,!locks.folder&&LOCK_NAME.folder].filter(Boolean).join(', ')+'.');
+  const apps=(await Promise.all([...selected].map(id=>idbGet('apps',id)))).filter(Boolean);
+  if(!apps.length){selected.clear();paint();return alert('Các hồ sơ đã chọn không còn trên website.')}
+  const n=apps.length,names=apps.slice(0,8).map(a=>`• ${a.identity?.studentName||'Chưa có họ tên'} (${a.code||a.id})`).join('\n')+(n>8?`\n… và ${n-8} hồ sơ khác`:'');
+  if(!confirm(`Xóa ${n} hồ sơ đã chọn?\n\n${names}\n\n• Hồ sơ bị gỡ khỏi website.\n• Thư mục hồ sơ tương ứng được chuyển vào Thùng rác Google Drive.\n\nThao tác này không hoàn tác được từ website.`))return;
+  if(n>=5&&text(prompt(`Xác nhận lần 2: gõ XOA để xóa ${n} hồ sơ.`)).trim().toUpperCase()!=='XOA')return alert('Đã hủy thao tác xóa.');
+  const cfg=await driveCfg();
+  if(!cfg)return alert('Chưa cấu hình Google Drive (URL Apps Script, mã kết nối, thư mục mẹ). Vào Thiết lập hệ thống để nhập trước khi xóa.');
+  bulkRunning=true;paint();
+  const ok=[],failed=[];let cursor=0;
+  const box=q('#recordDriveProgress'),progress=()=>{if(box)box.innerHTML=`<div class="notice">Đang xóa ${ok.length+failed.length}/${n} hồ sơ trên Google Drive và website…</div>`};
+  const run=async()=>{
+   progress();
+   const worker=async()=>{
+    while(cursor<apps.length){
+     const app=apps[cursor++];
+     try{await deleteOnDrive(cfg,app);await addTomb(app.id);await idbDel('apps',app.id);selected.delete(app.id);ok.push(app)}
+     catch(error){failed.push({app,message:text(error?.message||error)})}
+     progress();
+    }
+   };
+   await Promise.all(Array.from({length:Math.min(CFG.DELETE_POOL,apps.length)},worker));
+  };
+  try{typeof runUserOperation==='function'?await runUserOperation(`Đang xóa ${n} hồ sơ…`,run):await run()}
+  finally{bulkRunning=false}
+  if(failed.length){
+   const detail=failed.slice(0,5).map(x=>`• ${x.app.code||x.app.id}: ${x.message}`).join('\n');
+   if(confirm(`Đã xóa ${ok.length}/${n} hồ sơ.\n${failed.length} hồ sơ chưa xóa được trên Drive:\n${detail}\n\nVẫn gỡ ${failed.length} hồ sơ này khỏi website? Hệ thống sẽ tự thử xóa lại trên Drive ở các lần cập nhật sau.`)){
+    for(const x of failed){await addTomb(x.app.id);await idbDel('apps',x.app.id);selected.delete(x.app.id)}
+   }
+  }
+  if(box)box.innerHTML=failed.length?`<div class="notice warn">Đã xóa ${ok.length}/${n} hồ sơ trên Drive và website.</div>`:`<div class="notice ok">Đã xóa ${n} hồ sơ khỏi website và chuyển vào Thùng rác Google Drive.</div>`;
+  await refreshViews(true);
+  if(!failed.length)alert(`Đã xóa ${n} hồ sơ khỏi website và Google Drive.`);
+ }
+
+ /* ---------- Đồng bộ ngược từ Drive ---------- */
+ let syncing=false,tick=0,lastSyncAt=0,dirty=false;
+ const retryAt=new Map();
+ function liveText(msg,kind=''){lastLive={msg,kind};setText(q('#sf23LiveText'),msg);const dot=q('#sf23Dot');const c='sf23-dot'+(kind?' '+kind:'');if(dot&&dot.className!==c)dot.className=c}
+ function newerThanLocal(meta,local){
+  const rv=Number(meta.revision||1),lv=Number(local.revision||1);
+  if(rv>lv)return true;
+  return text(applicationLatestAt(meta))>text(applicationLatestAt(local));
+ }
+ async function importApp(cfg,item){
+  const r=await J(cfg.endpoint,{action:'driveItem',token:cfg.token,folder:cfg.folder,kind:'app',formId:item.formId,itemKey:item.itemKey},90000);
+  if(!r||!r.ok)return false;
+  const b64=text(r.fileBase64||r.pdfBase64||r.wordBase64);if(!b64)return false;
+  const meta=r.meta||item.meta||{},id=text(meta.id||item.itemKey);
+  if(tomb.has(id))return false;
+  const local=(await idbGet('apps',id))||{},fileName=text(r.fileName),isWord=/\.docx?$/i.test(fileName)||applicationIsWord(meta);
+  const record=Object.assign({},local,meta,{id,driveSyncStatus:DONE_DRIVE});
+  if(isWord){record.submissionMode='word';record.word=base64ToArrayBuffer(b64);record.wordName=fileName||meta._driveFileName||record.wordName||'';record.wordMime=r.fileMime||record.wordMime||''}
+  else record.pdf=base64ToArrayBuffer(b64);
+  await idbPut('apps',record);
+  return true;
+ }
+ async function syncFromDrive({fresh=false,manual=false}={}){
+  if(syncing||bulkRunning)return;
+  if(!manual&&(paused||!adminActive()))return;
+  if(!tombLoaded)await loadTomb();
+  await loadLocks();
+  const cfg=await driveCfg();
+  if(!cfg&&canRead()){liveText('Chưa cấu hình Drive','warn');return}
+  if(!canRead()){ /* SF24: thiếu URL Đọc dữ liệu → tạm khóa, không gọi driveList/driveItem */
+   liveText(readLockMsg(),'lock');
+   if(manual)alert('Tự cập nhật đang TẠM KHÓA.\n'+readLockMsg()+'.\n\nVào Thiết lập hệ thống để nhập đủ, chức năng sẽ tự mở khóa.');
+   return;
+  }
+  syncing=true;liveText('Đang kiểm tra Drive…','busy');
+  const btn=q('#sf23SyncNow');if(btn&&manual){btn.disabled=true}
+  try{
+   const params={action:'driveList',token:cfg.token,folder:cfg.folder};if(fresh)params.fresh='1';
+   const list=await J(cfg.endpoint,params,90000);
+   if(!list||!list.ok)throw new Error(list?.error||'Không đọc được danh sách Drive.');
+   const items=Array.isArray(list.items)?list.items:[],remote=new Map(),formsSeen=new Set();
+   for(const it of items){
+    if(it.kind==='form'){formsSeen.add(text(it.formId||it.meta?.id));continue}
+    if(it.kind!=='app')continue;
+    const meta=it.meta||{},id=text(meta.id||it.itemKey);if(!id||remote.has(id))continue;
+    remote.set(id,{formId:text(it.formId||meta.formId),itemKey:id,meta});
+   }
+   const locals=await idbAll('apps'),localMap=new Map(locals.map(a=>[text(a.id),a]));
+   const downloads=[],statusOnly=[],retries=[];
+   for(const [id,item] of remote){
+    if(tomb.has(id)){retries.push(item);continue}
+    const local=localMap.get(id),isWord=applicationIsWord(item.meta);
+    if(!local||!bufferAlive(isWord?local.word:local.pdf)){downloads.push({item,isNew:!local});continue}
+    if(newerThanLocal(item.meta,local)){downloads.push({item,isNew:false});continue}
+    const m=item.meta;
+    if(m.status&&m.status!==local.status&&text(m.statusUpdatedAt)>text(local.statusUpdatedAt||''))statusOnly.push({local,meta:m});
+   }
+   let added=0,updated=0,removed=0,changed=0;
+   let cursor=0;
+   const worker=async()=>{while(cursor<downloads.length){const d=downloads[cursor++];try{if(await importApp(cfg,d.item)){d.isNew?added++:updated++}}catch{}}};
+   await Promise.all(Array.from({length:Math.min(CFG.DOWNLOAD_POOL,downloads.length)},worker));
+   for(const s of statusOnly){
+    const rec={...s.local,status:s.meta.status,statusUpdatedAt:s.meta.statusUpdatedAt,driveSyncStatus:DONE_DRIVE};
+    if('needsReview'in s.meta)rec.needsReview=s.meta.needsReview;
+    await idbPut('apps',rec);changed++;
+   }
+   if(fresh&&formsSeen.size){
+    const now=Date.now();
+    for(const local of locals){
+     const id=text(local.id);if(remote.has(id)||!formsSeen.has(text(local.formId)))continue;
+     if(local.driveSyncStatus!==DONE_DRIVE)continue;
+     const at=Date.parse(applicationLatestAt(local)||'')||0;if(now-at<CFG.REMOVE_GRACE)continue;
+     await idbDel('apps',id);selected.delete(id);removed++;
+    }
+   }
+   for(const item of retries.slice(0,3)){
+    if(Date.now()-(retryAt.get(item.itemKey)||0)<CFG.RETRY_DELETE_GAP)continue;
+    retryAt.set(item.itemKey,Date.now());
+    deleteOnDrive(cfg,{id:item.itemKey,formId:item.formId,code:item.meta.code}).catch(()=>{});
+   }
+   lastSyncAt=Date.now();
+   const total=added+updated+removed+changed;
+   const time=new Date().toLocaleTimeString('vi-VN');
+   liveText(paused?`Đang tạm dừng · tải tay lúc ${time}`:`Tự cập nhật từ Drive · lần cuối ${time}`,paused?'warn':'ok');
+   if(total){
+    const parts=[];if(added)parts.push(`${added} hồ sơ mới`);if(updated)parts.push(`${updated} hồ sơ được cập nhật`);if(changed)parts.push(`${changed} hồ sơ đổi trạng thái`);if(removed)parts.push(`${removed} hồ sơ đã bị xóa ở máy khác`);
+    toast('Drive: '+parts.join(' · '));
+   }
+   if(total||manual)await refreshViews(manual);
+  }catch(error){
+   liveText('Chưa kết nối được Drive · thử lại sau','warn');
+   if(manual)alert(typeof driveHierarchyError==='function'?driveHierarchyError(error):text(error?.message||error));
+  }finally{
+   syncing=false;if(btn)btn.disabled=false;
+  }
+ }
+
+ /* ---------- Vẽ lại mà không mất ô tìm kiếm / lọc / vị trí cuộn ---------- */
+ async function refreshViews(force=false){
+  if(modalOpen()&&!force){dirty=true;return}
+  dirty=false;
+  if(recordsVisible()&&typeof window.renderRecords==='function'){
+   const s=q('#recSearch')?.value||'',st=q('#recStatus')?.value||'',y=window.scrollY,focused=document.activeElement?.id;
+   try{await window.renderRecords()}catch{}
+   const s2=q('#recSearch'),st2=q('#recStatus');
+   if(st2&&st){st2.value=st;st2.dispatchEvent(new Event('change'))}
+   if(s2&&s){s2.value=s;s2.dispatchEvent(new Event('input'))}
+   if(focused==='recSearch'&&s2){s2.focus();try{s2.setSelectionRange(s.length,s.length)}catch{}}
+   try{window.scrollTo({top:y})}catch{}
+   decorate();
+  }
+  if(q('#av-dashboard:not(.hidden)')&&typeof window.renderDashboard==='function')try{await window.renderDashboard()}catch{}
+ }
+ function toast(message){
+  let el=q('#sf23Toast');
+  if(!el){el=document.createElement('div');el.id='sf23Toast';el.setAttribute('role','status');document.body.appendChild(el)}
+  el.textContent=message;el.classList.add('show');
+  clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove('show'),6000);
+ }
+
+ /* ---------- Lịch chạy ---------- */
+ setInterval(()=>{
+  if(!adminActive())return;
+  if(dirty&&!modalOpen())refreshViews();
+  tick++;
+  syncFromDrive({fresh:recordsVisible()||tick%CFG.FRESH_EVERY===0}).catch(()=>{});
+ },CFG.TICK);
+ const soon=()=>setTimeout(()=>{if(adminActive()&&Date.now()-lastSyncAt>5000)syncFromDrive({fresh:true}).catch(()=>{})},700);
+ window.addEventListener('focus',soon);
+ window.addEventListener('online',soon);
+ document.addEventListener('visibilitychange',()=>{if(!document.hidden)soon()});
+ window.sf23SyncNow=()=>syncFromDrive({fresh:true,manual:true});
+
+ let decorateTimer=null,wasRecords=false;
+ const observer=new MutationObserver(()=>{
+  clearTimeout(decorateTimer);
+  decorateTimer=setTimeout(()=>{
+   if(recordsVisible()){decorate();if(!wasRecords&&Date.now()-lastSyncAt>10000)syncFromDrive({fresh:true}).catch(()=>{})}
+   wasRecords=recordsVisible();
+   if(dirty&&!modalOpen())refreshViews();
+  },80);
+ });
+
+ function installStyles(){
+  if(q('#sf23Style'))return;
+  const style=document.createElement('style');style.id='sf23Style';style.textContent=`
+   .sf23-bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:0 0 14px;padding:10px 12px;border:1px solid var(--line);border-radius:14px;background:#f7fafc}
+   .sf23-bar .btn{padding:8px 13px;font-size:12.5px}
+   .sf23-all,.sf23-group{display:inline-flex;align-items:center;gap:8px;font-weight:800;font-size:12.5px;color:#23415a;cursor:pointer;user-select:none}
+   .sf23-all input,.sf23-group input,.sf23-pick input{width:18px;height:18px;margin:0;accent-color:var(--pri);cursor:pointer;flex:0 0 auto}
+   .sf23-count{font-size:12.5px;color:var(--muted);font-weight:700}
+   .sf23-live{margin-left:auto;display:inline-flex;align-items:center;gap:8px;font-size:11.5px;color:var(--muted)}
+   .sf23-dot{width:9px;height:9px;border-radius:50%;background:#b8c4cf;flex:0 0 auto}
+   .sf23-dot.ok{background:var(--ok)}.sf23-dot.warn{background:var(--warn)}.sf23-dot.busy{background:var(--pri);animation:sf23pulse 1s infinite}
+   @keyframes sf23pulse{50%{opacity:.35}}
+   .sf23-group{margin:10px 14px 0;padding:7px 10px;border:1px dashed #cbd8e2;border-radius:10px;background:#fff}
+   .sf23-pick{display:inline-flex;align-items:center;padding:4px;margin-right:2px;cursor:pointer}
+   .student-card.sf23-selected{outline:2px solid var(--bad);outline-offset:-2px;background:#fff6f6}
+   #sf23Toast{position:fixed;left:50%;bottom:22px;transform:translate(-50%,20px);opacity:0;pointer-events:none;z-index:9999;max-width:min(560px,calc(100vw - 32px));padding:11px 16px;border-radius:12px;background:#123f59;color:#fff;font-size:13px;font-weight:700;box-shadow:0 14px 38px rgba(19,48,77,.25);transition:.25s}
+   #sf23Toast.show{opacity:1;transform:translate(-50%,0)}
+   @media(max-width:640px){.sf23-live{margin-left:0;width:100%}.sf23-bar .btn{flex:1}}
+   /* SF24 */
+   #recordsPullDrive,#recordsSyncDrive{display:none!important}
+   #av-records:not(.sf24-del-on) #sf23Bar,#av-records:not(.sf24-del-on) .sf23-pick,#av-records:not(.sf24-del-on) .sf23-group{display:none!important}
+   #sf24DelToggle{white-space:nowrap}
+   .sf24-codebox{display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex:0 0 auto}
+   .sf24-type{font-size:10.5px;font-weight:900;letter-spacing:.02em;padding:4px 9px;border-radius:999px;border:1px solid;white-space:nowrap}
+   .sf24-type.pdf{color:#b42318;background:#fef3f2;border-color:#fecdca}
+   .sf24-type.word{color:#1d4ed8;background:#eff6ff;border-color:#bfdbfe}
+   .sf24-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:10px}
+   .sf24-svc{flex-basis:100%;display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:6px}
+   .sf24-svc-title{font-size:12px;margin-right:4px}.sf24-svc-title.ok{color:var(--ok)}.sf24-svc-title.warn{color:#b45309}
+   .sf24-chip{font-size:11px;font-weight:800;padding:4px 9px;border-radius:999px;border:1px solid;white-space:nowrap}
+   .sf24-chip.on{color:#047857;background:#ecfdf5;border-color:#a7f3d0}.sf24-chip.off{color:#92400e;background:#fffbeb;border-color:#fcd34d}
+   .sf24-svc .btn{padding:5px 11px;font-size:11.5px;min-height:0}
+   .sf23-dot.lock{background:#d97706}
+   .btn.sf24-locked,#sf24Head .btn:disabled{opacity:.62;cursor:not-allowed;transform:none;box-shadow:none}
+   .sf24-head .sf23-live{margin-left:0;padding:8px 12px;border:1px solid var(--line);border-radius:999px;background:#f7fafc;font-weight:700}
+   @media(max-width:640px){.sf24-head{width:100%}.sf24-head .btn{flex:1}.sf24-head .sf23-live{width:100%;justify-content:center}}
+  `;document.head.appendChild(style);
+ }
+ function boot(){
+  installStyles();loadTomb();if(paused)lastLive={msg:'Đã tạm dừng tự cập nhật',kind:'warn'};
+  observer.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['class']});
+  if(recordsVisible())decorate();
+ }
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
+})();
+/* ===== Kết thúc SmartForms 23.0 ===== */
 
 </script></body></html>
