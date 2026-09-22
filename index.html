@@ -129,7 +129,7 @@ function cloneForStorage(v,seen=new WeakMap()){
  let o={};seen.set(v,o);for(let [k,x] of Object.entries(v))o[k]=cloneForStorage(x,seen);return o
 }
 function openDB(){return new Promise((res,rej)=>{let r=indexedDB.open('st_smartforms_pdf_native',1);r.onupgradeneeded=()=>{let d=r.result;for(let n of ['forms','apps','settings','emails'])if(!d.objectStoreNames.contains(n))d.createObjectStore(n,{keyPath:'id'})};r.onsuccess=()=>{DB=r.result;res()};r.onerror=()=>rej(r.error)})}
-function idbPut(st,o){return new Promise((res,rej)=>{let safe;try{safe=cloneForStorage(o)}catch(e){rej(e);return}let r=DB.transaction(st,'readwrite').objectStore(st).put(safe);r.onsuccess=()=>res(o);r.onerror=()=>rej(r.error)})}
+function idbPut(st,o){return new Promise((res,rej)=>{let safe;try{safe=cloneForStorage(o)}catch(e){rej(e);return}const tx=DB.transaction(st,'readwrite');tx.objectStore(st).put(safe);tx.oncomplete=()=>res(o);tx.onerror=()=>rej(tx.error||new Error('Không lưu được dữ liệu.'));tx.onabort=()=>rej(tx.error||new Error('Lưu dữ liệu bị gián đoạn.'))})}
 function idbGet(st,id){return new Promise((res,rej)=>{let r=DB.transaction(st).objectStore(st).get(id);r.onsuccess=()=>res(r.result||null);r.onerror=()=>rej(r.error)})}
 function idbAll(st){return new Promise((res,rej)=>{let r=DB.transaction(st).objectStore(st).getAll();r.onsuccess=()=>res(r.result||[]);r.onerror=()=>rej(r.error)})}
 function idbDel(st,id){return new Promise((res,rej)=>{let r=DB.transaction(st,'readwrite').objectStore(st).delete(id);r.onsuccess=()=>res();r.onerror=()=>rej(r.error)})}
@@ -1894,7 +1894,7 @@ function jsonp_(callback,value){return ContentService.createTextOutput(callback+
  /* ===== End chỉnh sửa hồ sơ ===== */
 
  /* ===== Google Drive phân cấp · thay thế đúng hồ sơ hiện tại ===== */
-const DRIVE_HIERARCHY_APPS_SCRIPT=String.raw`const API_VERSION='ST SmartForms Drive Hierarchy 12.2.0 · Hierarchy 7.0.1 compatibility · Shared Access 8.0.1 · Recovery 9.0 · Delete Sync 10.2 · Word/PDF Upload 11.0 · Public Forms 11.1 · Identity Lookup 12.0.1 · Record Delete 13.0 · Fast Sync 14.0 · Fast Catalog 20.0';
+const DRIVE_HIERARCHY_APPS_SCRIPT=String.raw`const API_VERSION='ST SmartForms Drive Hierarchy 12.2.0 · Hierarchy 7.0.1 compatibility · Shared Access 8.0.1 · Recovery 9.0 · Delete Sync 10.2 · Word/PDF Upload 11.0 · Public Forms 11.1 · Identity Lookup 12.0.1 · Record Delete 13.0 · Fast Sync 14.0 · Fast Catalog 20.0 · Account Config 25.0 · Link Bridge 25.0';
 const SYSTEM_ROOT='ST SmartForms - Hồ sơ hành chính';
 const FORM_SOURCE='01 - Biểu mẫu gốc';
 const FORM_RECORDS='02 - Hồ sơ đã tiếp nhận';
@@ -1904,6 +1904,7 @@ const ADMIN_RECOVERY_PROPERTY='SMARTFORMS_ADMIN_RECOVERY_CODE';
 
 function setupSmartFormsDrive(){
   DriveApp.getRootFolder().getName();
+  UrlFetchApp.getRequest('https://is.gd/create.php'); // Xin quyền kết nối dịch vụ rút gọn; chưa tạo link.
   const props=PropertiesService.getScriptProperties();
   let token=props.getProperty('SMARTFORMS_DRIVE_TOKEN');
   if(!token){token=Utilities.getUuid().replace(/-/g,'')+Utilities.getUuid().replace(/-/g,'');props.setProperty('SMARTFORMS_DRIVE_TOKEN',token)}
@@ -1925,6 +1926,8 @@ function doPost(e){
     if(data.action==='adminLogin')return adminLogin_(data,requestId);
     if(data.action==='adminPasswordReset')return adminPasswordReset_(data,requestId);
     requireToken_(data.token);
+    if(data.action==='adminConfigSave')return sf25ConfigSave_(data,requestId);
+    if(data.action==='adminShortenLink')return sf25Shorten_(data,requestId);
     if(data.action==='adminAccountSet')return adminAccountSet_(data,requestId);
     if(data.action==='driveSync'){
       const base=folder_(data.folder),kind=data.kind==='form'?'form':'app',meta=JSON.parse(data.metaJson||'{}'),itemKey=safe_(data.itemKey),pdfName=fileName_(data.pdfName||'file.pdf'),wordName=wordName_(data.wordName||''),recordName=recordFileName_(data.fileName||data.wordName||data.pdfName||'file.pdf',data.fileMime||'');
@@ -1979,7 +1982,8 @@ function doGet(e){
       return jsonp_(callback,{ok:true,exists:!!(item&&meta&&file),revision:Number(meta&&meta.revision||0),fileName:file?file.getName():''});
     }
     requireToken_(q.token);
-    if(q.action==='bridgeHealth')return jsonp_(callback,{ok:true,apiVersion:API_VERSION,serviceAccount:Session.getEffectiveUser().getEmail()||Session.getActiveUser().getEmail()||'',writeService:'DriveApp'});
+    if(q.action==='adminConfigGet')return jsonp_(callback,{ok:true,configStorage:25,config:sf25ConfigRead_()});
+    if(q.action==='bridgeHealth')return jsonp_(callback,{ok:true,apiVersion:API_VERSION,serviceAccount:Session.getEffectiveUser().getEmail()||Session.getActiveUser().getEmail()||'',writeService:'DriveApp',serviceRole:typeof SF_SERVICE_ROLE==='undefined'?'all':SF_SERVICE_ROLE,configStorage:25});
     if(q.action==='requestStatus')return jsonp_(callback,requestStatus_(q.requestId));
     if(q.action==='adminCatalog')return jsonp_(callback,{ok:true,apiVersion:API_VERSION,folders:adminCatalog_(q.folder||'')});
     const base=folder_(q.folder);
@@ -2171,7 +2175,7 @@ function adminLogin_(data,requestId){
   const account=adminAccountRecord_(),username=String(data.username||'').trim(),hash=String(data.hash||'').trim();
   if(!account||!secureEqual_(username,account.username)||!secureEqual_(hash,account.hash))return requestText_(requestId,false,'invalid credentials');
   const props=PropertiesService.getScriptProperties(),serviceToken=props.getProperty('SMARTFORMS_DRIVE_TOKEN')||'',folderId=props.getProperty('SMARTFORMS_ROOT_FOLDER_ID')||'',session=Utilities.getUuid().replace(/-/g,'')+Utilities.getUuid().replace(/-/g,'');cache.put('ADMIN_SESSION_'+session,'1',21600);
-  return requestText_(requestId,true,'signed in',{username:account.username,session:session,serviceToken:serviceToken,folderUrl:folderId?'https://drive.google.com/drive/folders/'+folderId:'',publicSiteUrl:String(account.publicSiteUrl||'')});
+  return requestText_(requestId,true,'signed in',{username:account.username,session:session,serviceToken:serviceToken,folderUrl:folderId?'https://drive.google.com/drive/folders/'+folderId:'',publicSiteUrl:String(account.publicSiteUrl||''),adminConfig:sf25ConfigRead_()});
 }
 function proofDigits_(value){return String(value||'').replace(/\D/g,'')}
 function sha256Hex_(value){return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,String(value||''),Utilities.Charset.UTF_8).map(function(byte){return('0'+((byte<0?byte+256:byte).toString(16))).slice(-2)}).join('')}
@@ -2252,6 +2256,94 @@ function requestText_(requestId,ok,message,data){const key=requestKey_(requestId
 function requestStatus_(requestId){const key=requestKey_(requestId);if(!key)return{ok:false,error:'invalid request id'};const raw=CacheService.getScriptCache().get(key);if(!raw)return{ok:true,pending:true};try{return{ok:true,pending:false,result:JSON.parse(raw)}}catch(err){return{ok:false,error:'invalid request status'}}}
 function jsonp_(callback,value){return ContentService.createTextOutput(callback+'('+JSON.stringify(value)+')').setMimeType(ContentService.MimeType.JAVASCRIPT)}
 function errorText_(err){return String(err&&err.message||err||'Loi Apps Script')}
+
+/* Cấu hình của tài khoản quản trị: chỉ lưu trong Script Properties của Writer.
+   Không đưa URL/token vào metadata, danh mục công khai hoặc link phụ huynh. */
+const SF25_CONFIG_KEY='SMARTFORMS_ADMIN_CONFIG_V25';
+function sf25ConfigRead_(){
+  const raw=PropertiesService.getScriptProperties().getProperty(SF25_CONFIG_KEY);
+  if(!raw)return{version:0,drive:{},gmail:{}};
+  try{return JSON.parse(raw)}catch(err){throw new Error('Không đọc được cấu hình tài khoản đã lưu. Không ghi đè bản này.')}
+}
+function sf25Fields_(old,patch,fields){
+  const out={};old=old||{};patch=patch||{};
+  fields.forEach(function(key){
+    const value=Object.prototype.hasOwnProperty.call(patch,key)?patch[key]:old[key];
+    if(typeof value==='boolean'){out[key]=value;return}
+    const text=String(value==null?'':value).trim();
+    out[key]=key==='parentShortName'&&Object.prototype.hasOwnProperty.call(patch,key)?text:text||String(old[key]||'');
+  });
+  return out;
+}
+function sf25ConfigMerge_(current,patch){
+  const out={drive:current.drive||{},gmail:current.gmail||{}};
+  if(patch.drive){
+    out.drive=sf25Fields_(out.drive,patch.drive,['appsScriptUrl','appsScriptToken','folderUrl','publicSiteUrl','autoForms','autoApps','parentShortLink','parentShortName','parentShortSource','parentShortAt']);
+    out.drive.driveServices={};
+    ['write','read','public'].forEach(function(role){out.drive.driveServices[role]=sf25Fields_(current.drive&&current.drive.driveServices&&current.drive.driveServices[role],patch.drive.driveServices&&patch.drive.driveServices[role],['appsScriptUrl','appsScriptToken'])});
+  }
+  if(patch.gmail)out.gmail=sf25Fields_(out.gmail,patch.gmail,['appsScriptUrl','appsScriptToken']);
+  [out.drive,out.gmail].concat(Object.keys(out.drive.driveServices||{}).map(function(role){return out.drive.driveServices[role]})).forEach(function(service){
+    if(service.appsScriptUrl&&!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(service.appsScriptUrl))throw new Error('URL cấu hình chưa hợp lệ.');
+    if(String(service.appsScriptToken||'').length>500)throw new Error('Token quá dài.');
+  });
+  return out;
+}
+function sf25StoreConfig_(config){
+  const raw=JSON.stringify(config);
+  if(Utilities.newBlob(raw).getBytes().length>8500)throw new Error('Cấu hình quá lớn. Hãy rút ngắn địa chỉ website hoặc tên link.');
+  PropertiesService.getScriptProperties().setProperty(SF25_CONFIG_KEY,raw);
+}
+function sf25ConfigSave_(data,requestId){
+  const account=adminAccountRecord_();
+  if(!account||!secureEqual_(String(data.username||''),String(account.username||'')))throw new Error('Tài khoản quản trị không khớp với dự án Ghi dữ liệu.');
+  const lock=LockService.getScriptLock();if(!lock.tryLock(10000))throw new Error('Hệ thống đang lưu cấu hình. Hãy thử lại.');
+  try{
+    const current=sf25ConfigRead_();
+    if(Number(data.expectedVersion)!==Number(current.version||0))throw new Error('CONFIG_CONFLICT: Cấu hình đã được cập nhật trên máy khác. Hãy lấy cấu hình tài khoản rồi sửa lại mục cần thay đổi.');
+    const next=sf25ConfigMerge_(current,data.config||{});
+    next.version=Number(current.version||0)+1;next.updatedAt=new Date().toISOString();
+    sf25StoreConfig_(next);
+    return requestText_(requestId,true,'Đã lưu cấu hình theo tài khoản',{version:next.version,updatedAt:next.updatedAt});
+  }finally{lock.releaseLock()}
+}
+function sf25ShortError_(code,message){const err=new Error(message);err.sfCode=code;return err}
+function sf25Shorten_(data,requestId){
+  try{
+    const longUrl=String(data.url||'').trim(),alias=String(data.alias||'').trim(),config=sf25ConfigRead_();
+    if(!/^https:\/\/[^\s?#@]+(?:\/[^\s?#]*)?\?/.test(longUrl)||longUrl.length>3500)throw sf25ShortError_('INVALID_URL','Link phụ huynh phải là địa chỉ HTTPS công khai.');
+    const query={};longUrl.split('?').slice(1).join('?').split('#')[0].split('&').forEach(function(pair){const parts=pair.split('=');query[decodeURIComponent(parts[0])]=decodeURIComponent(parts.slice(1).join('=').replace(/\+/g,' '))});
+    if(query.view!=='parent'||Object.keys(query).some(function(key){return['view','sf','sf_service','sf_folder'].indexOf(key)<0}))throw sf25ShortError_('INVALID_URL','Chỉ rút gọn liên kết phụ huynh do hệ thống tạo.');
+    const site=String(config.drive&&config.drive.publicSiteUrl||'').split(/[?#]/)[0];
+    if(site&&longUrl.split('?')[0].replace(/\/$/,'')!==site.replace(/\/$/,''))throw sf25ShortError_('INVALID_URL','Link không thuộc website đã lưu của tài khoản này.');
+    if(alias&&!/^[A-Za-z0-9_]{5,30}$/.test(alias))throw sf25ShortError_('ALIAS','Tên link cần 5–30 chữ, số hoặc dấu gạch dưới.');
+    if(config.drive&&config.drive.parentShortSource===longUrl&&String(config.drive.parentShortName||'')===alias&&config.drive.parentShortLink&&!data.force)return requestText_(requestId,true,'Link đã lưu',{short:config.drive.parentShortLink,version:config.version});
+    const cache=CacheService.getScriptCache(),cooldown=Number(cache.get('SF25_SHORT_COOLDOWN')||0);
+    if(cooldown>Date.now())throw sf25ShortError_('RATE','Dịch vụ giới hạn lượt tạo link. Hãy chờ khoảng một phút rồi thử lại.');
+    let short='',last='Chưa kết nối được dịch vụ rút gọn.';
+    const services=['https://is.gd/create.php','https://v.gd/create.php'];
+    for(let i=0;i<services.length;i++){
+      try{
+        const payload={format:'json',url:longUrl};if(alias)payload.shorturl=alias;else if(data.force)payload.shorturl='sf_'+Utilities.getUuid().replace(/-/g,'').slice(0,12);
+        const response=UrlFetchApp.fetch(services[i],{method:'post',payload:payload,muteHttpExceptions:true,followRedirects:true});
+        let result;try{result=JSON.parse(response.getContentText())}catch(err){throw new Error('Dịch vụ rút gọn chưa trả về dữ liệu hợp lệ.')}
+        if(/^https:\/\/(is\.gd|v\.gd)\/[A-Za-z0-9_]+$/.test(String(result.shorturl||''))){short=String(result.shorturl);break}
+        const code=Number(result.errorcode||0);
+        if(code===1)throw sf25ShortError_('INVALID_URL','Dịch vụ không chấp nhận link phụ huynh. Hãy kiểm tra website đã được công khai.');
+        if(code===2)throw sf25ShortError_('ALIAS','Tên link đã được dùng hoặc không được dịch vụ chấp nhận. Hãy chọn tên khác.');
+        if(code===3){cache.put('SF25_SHORT_COOLDOWN',String(Date.now()+60000),60);throw sf25ShortError_('RATE','Dịch vụ giới hạn lượt tạo link. Hãy chờ khoảng một phút rồi thử lại.')}
+        throw new Error('Dịch vụ rút gọn tạm thời chưa sẵn sàng.');
+      }catch(error){if(error.sfCode)throw error;last=String(error.message||error)}
+    }
+    if(!short)throw sf25ShortError_('NETWORK',last);
+    // Chỉ cập nhật link sau khi dịch vụ đã trả về kết quả hợp lệ; giữ mọi cấu hình khác.
+    const lock=LockService.getScriptLock();if(!lock.tryLock(10000))throw new Error('Đã tạo link nhưng chưa lưu được. Hãy thử lại.');
+    let next;
+    try{const latest=sf25ConfigRead_();next=sf25ConfigMerge_(latest,{drive:{parentShortLink:short,parentShortName:alias,parentShortSource:longUrl,parentShortAt:new Date().toISOString()}});next.version=Number(latest.version||0)+1;next.updatedAt=new Date().toISOString();sf25StoreConfig_(next)}finally{lock.releaseLock()}
+    return requestText_(requestId,true,'Đã tạo và lưu link phụ huynh',{short:short,service:short.split('/')[2],version:next.version});
+  }catch(error){return requestText_(requestId,false,String(error.message||error),{code:error.sfCode||'NETWORK'})}
+}
+
 `;
 
  function driveHierarchyRoot(settings){let candidates=[settings?.folderUrl,...Object.values(settings?.formFolders||{})].filter(Boolean);for(let value of candidates)try{return normalizeDriveFolderUrl(value)}catch{}return''}
@@ -2339,7 +2431,7 @@ function errorText_(err){return String(err&&err.message||err||'Loi Apps Script')
  async function syncAdminAccountRemote(account=localAdminAccount()){if(!account.username||!account.salt||!account.hash)return false;let settings=await driveBridgeSettings(),root=driveHierarchyRoot(settings),site=normalizePublicSiteUrl(settings.publicSiteUrl)||'';assertDriveBridge(settings);if(!root)throw new Error('Chưa có thư mục mẹ để lưu tài khoản quản trị.');await bridgePostConfirmed({action:'adminAccountSet',username:account.username,salt:account.salt,hash:account.hash,iterations:Number(account.it||180000),folder:root,publicSiteUrl:site},90000);return true}
  function localAdminPanel(){let exists=authExists();return exists?`<div class="card panel connection-card"><h2>Đăng nhập quản trị</h2><p class="auth-subtitle">Sử dụng tài khoản quản trị đã được thiết lập trên thiết bị này.</p><form id="localAdminLogin" style="display:grid;gap:13px"><div class="field"><label>Tên đăng nhập</label><input name="username" autocomplete="username" required></div><div class="field"><label>Mật khẩu</label><input name="password" type="password" autocomplete="current-password" required></div><button class="btn primary">Đăng nhập</button></form></div>`:`<div class="card panel connection-card"><h2>Khởi tạo tài khoản quản trị</h2><p class="auth-subtitle">Thiết lập tài khoản đầu tiên để quản lý hệ thống. Tài khoản sẽ được đồng bộ sau khi hoàn tất kết nối Google Drive.</p><form id="localAdminSetup" class="formgrid"><div class="field full"><label>Tên đăng nhập</label><input name="username" minlength="3" autocomplete="username" required></div><div class="field"><label>Mật khẩu</label><input name="password" type="password" minlength="8" autocomplete="new-password" required></div><div class="field"><label>Nhập lại mật khẩu</label><input name="password2" type="password" minlength="8" autocomplete="new-password" required></div><div class="field full"><button class="btn primary">Tạo tài khoản và tiếp tục</button></div></form></div>`}
  function bindLocalAdminPanel(){let setup=$('#localAdminSetup');if(setup)setup.onsubmit=async event=>{event.preventDefault();let data=collectForm(event.target);if(data.password!==data.password2)return alert('Hai lần nhập mật khẩu không khớp.');let salt=arrayBufferToBase64(crypto.getRandomValues(new Uint8Array(24)).buffer),hash=await passwordHash(data.password,salt);saveLocalAdminAccount({username:data.username.trim(),salt,hash,it:180000});state.admin=true;renderAdminGate()};let login=$('#localAdminLogin');if(login)login.onsubmit=async event=>{event.preventDefault();let data=collectForm(event.target),account=localAdminAccount(),hash=await passwordHash(data.password,account.salt,account.it||180000);if(data.username.trim()!==account.username||hash!==account.hash)return alert('Tên đăng nhập hoặc mật khẩu không chính xác.');state.admin=true;renderAdminGate()}}
- renderAdminGate=async function(){let gate=$('#adminGate'),app=$('#adminApp');if(state.admin){gate.classList.add('hidden');app.classList.remove('hidden');let view=readUiSession().adminView;showAdminView(['dashboard','forms','records','drive','gmail','settings'].includes(view)?view:'dashboard');return}app.classList.add('hidden');gate.classList.remove('hidden');let endpoint=await driveBridgeEndpoint();if(!endpoint){gate.innerHTML=`<div class="card panel connection-card"><h2>Kết nối trang quản trị</h2><p>Nếu mở trên máy mới, dán URL Web App Apps Script một lần. Sau khi đăng nhập, dữ liệu và cấu hình Drive sẽ tự tải về.</p><form id="adminEndpointForm"><div class="field"><label>URL Web App Apps Script</label><input name="endpoint" placeholder="https://script.google.com/macros/s/.../exec" required></div><button class="btn primary" style="margin-top:13px;width:100%">Tiếp tục</button></form></div>${localAdminPanel()}`;$('#adminEndpointForm').onsubmit=async event=>{event.preventDefault();let value=normalizeDriveBridgeUrl(event.target.endpoint.value);if(!value)return alert('URL chưa đúng. URL phải kết thúc bằng /exec.');await activateAdminEndpoint(value);renderAdminGate()};bindLocalAdminPanel();return}try{let status=await remoteAdminStatus();if(!status?.configured){gate.innerHTML=`<div class="notice warn" style="max-width:620px;margin:20px auto">Tài khoản quản trị của kết nối này chưa được tạo. Hãy khởi tạo tài khoản bên dưới, sau đó vào <b>Kết nối Drive</b> và bấm <b>Lưu & kết nối</b>.</div>${localAdminPanel()}`;bindLocalAdminPanel();return}gate.innerHTML=`<div class="card panel connection-card"><h2>Đăng nhập quản trị</h2><p>Tài khoản này chỉ mở không gian dữ liệu gắn với URL Apps Script hiện tại và không phụ thuộc Gmail đang đăng nhập.</p><form id="remoteAdminLogin" style="display:grid;gap:13px"><div class="field"><label>Tên đăng nhập</label><input name="username" value="${esc(status.username||'')}" autocomplete="username" required></div><div class="field"><label>Mật khẩu</label><input name="password" type="password" autocomplete="current-password" required></div><button class="btn primary">Đăng nhập</button></form><div id="adminLoginProgress" style="margin-top:12px"></div><button id="changeAdminEndpoint" class="btn ghost" style="margin-top:12px;width:100%">Bỏ kết nối và về link GitHub ban đầu</button></div>`;$('#changeAdminEndpoint').onclick=resetAdminConnection;$('#remoteAdminLogin').onsubmit=async event=>{event.preventDefault();let button=event.submitter||event.target.querySelector('button'),box=$('#adminLoginProgress'),data=collectForm(event.target);button.disabled=true;button.textContent='Đang đăng nhập…';box.innerHTML='';try{let hash=await passwordHash(data.password,status.salt,status.iterations||180000),result=await sharedPublicPost({action:'adminLogin',username:data.username.trim(),hash},90000),username=result.username||data.username.trim();saveLocalAdminAccount({username,salt:status.salt,hash,it:status.iterations||180000});rememberAdminBinding(username,endpoint);await saveGatewayLocal({appsScriptUrl:endpoint,appsScriptToken:result.serviceToken||'',folderUrl:result.folderUrl||'',formFolders:{},publicSiteUrl:result.publicSiteUrl||'',autoForms:true,autoApps:true});saveRemoteAdminSession(result.session||'1');state.admin=true;await renderAdminGate();let dash=$('#av-dashboard');if(dash)dash.insertAdjacentHTML('afterbegin','<div id="remoteLoadNotice" class="notice" style="margin-bottom:14px">Đang tải dữ liệu mới nhất từ Drive…</div>');try{await pullDriveHierarchy();showAdminView('dashboard')}catch(error){let note=$('#remoteLoadNotice');if(note){note.className='notice warn';note.textContent='Đã đăng nhập nhưng chưa lấy được dữ liệu Drive: '+driveHierarchyError(error)}}}catch(error){button.disabled=false;button.textContent='Đăng nhập';box.innerHTML=`<div class="notice bad">${esc(/invalid credentials/i.test(error.message)?'Tên đăng nhập hoặc mật khẩu chưa đúng.':error.message)}</div>`}}}catch(error){gate.innerHTML=`<div class="notice bad" style="max-width:650px;margin:22px auto">${esc(error.message)}</div><div class="card panel connection-card"><h2>Kiểm tra lại kết nối</h2><button id="resetAdminEndpoint" class="btn primary" style="width:100%">Bỏ kết nối và nhập URL khác</button></div>${localAdminPanel()}`;$('#resetAdminEndpoint').onclick=resetAdminConnection;bindLocalAdminPanel()}};
+ renderAdminGate=async function(){let gate=$('#adminGate'),app=$('#adminApp');if(state.admin){gate.classList.add('hidden');app.classList.remove('hidden');let view=readUiSession().adminView;showAdminView(['dashboard','forms','records','drive','gmail','settings'].includes(view)?view:'dashboard');return}app.classList.add('hidden');gate.classList.remove('hidden');let endpoint=await driveBridgeEndpoint();if(!endpoint){gate.innerHTML=`<div class="card panel connection-card"><h2>Kết nối trang quản trị</h2><p>Nếu mở trên máy mới, dán URL Web App Apps Script một lần. Sau khi đăng nhập, dữ liệu và cấu hình Drive sẽ tự tải về.</p><form id="adminEndpointForm"><div class="field"><label>URL Web App Apps Script</label><input name="endpoint" placeholder="https://script.google.com/macros/s/.../exec" required></div><button class="btn primary" style="margin-top:13px;width:100%">Tiếp tục</button></form></div>${localAdminPanel()}`;$('#adminEndpointForm').onsubmit=async event=>{event.preventDefault();let value=normalizeDriveBridgeUrl(event.target.endpoint.value);if(!value)return alert('URL chưa đúng. URL phải kết thúc bằng /exec.');await activateAdminEndpoint(value);renderAdminGate()};bindLocalAdminPanel();return}try{let status=await remoteAdminStatus();if(!status?.configured){gate.innerHTML=`<div class="notice warn" style="max-width:620px;margin:20px auto">Tài khoản quản trị của kết nối này chưa được tạo. Hãy khởi tạo tài khoản bên dưới, sau đó vào <b>Kết nối Drive</b> và bấm <b>Lưu & kết nối</b>.</div>${localAdminPanel()}`;bindLocalAdminPanel();return}gate.innerHTML=`<div class="card panel connection-card"><h2>Đăng nhập quản trị</h2><p>Tài khoản này chỉ mở không gian dữ liệu gắn với URL Apps Script hiện tại và không phụ thuộc Gmail đang đăng nhập.</p><form id="remoteAdminLogin" style="display:grid;gap:13px"><div class="field"><label>Tên đăng nhập</label><input name="username" value="${esc(status.username||'')}" autocomplete="username" required></div><div class="field"><label>Mật khẩu</label><input name="password" type="password" autocomplete="current-password" required></div><button class="btn primary">Đăng nhập</button></form><div id="adminLoginProgress" style="margin-top:12px"></div><button id="changeAdminEndpoint" class="btn ghost" style="margin-top:12px;width:100%">Bỏ kết nối và về link GitHub ban đầu</button></div>`;$('#changeAdminEndpoint').onclick=resetAdminConnection;$('#remoteAdminLogin').onsubmit=async event=>{event.preventDefault();let button=event.submitter||event.target.querySelector('button'),box=$('#adminLoginProgress'),data=collectForm(event.target);button.disabled=true;button.textContent='Đang đăng nhập…';box.innerHTML='';try{let hash=await passwordHash(data.password,status.salt,status.iterations||180000),result=await sharedPublicPost({action:'adminLogin',username:data.username.trim(),hash},90000),username=result.username||data.username.trim();saveLocalAdminAccount({username,salt:status.salt,hash,it:status.iterations||180000});rememberAdminBinding(username,endpoint);await saveGatewayLocal({appsScriptUrl:endpoint,appsScriptToken:result.serviceToken||'',folderUrl:result.folderUrl||'',formFolders:{},publicSiteUrl:result.publicSiteUrl||'',autoForms:true,autoApps:true});if(result.adminConfig&&window.sf25Config)await window.sf25Config.applyRemote(result.adminConfig,{force:true});saveRemoteAdminSession(result.session||'1');state.admin=true;await renderAdminGate();let dash=$('#av-dashboard');if(dash)dash.insertAdjacentHTML('afterbegin','<div id="remoteLoadNotice" class="notice" style="margin-bottom:14px">Đang tải dữ liệu mới nhất từ Drive…</div>');try{await pullDriveHierarchy();showAdminView('dashboard')}catch(error){let note=$('#remoteLoadNotice');if(note){note.className='notice warn';note.textContent='Đã đăng nhập nhưng chưa lấy được dữ liệu Drive: '+driveHierarchyError(error)}}}catch(error){button.disabled=false;button.textContent='Đăng nhập';box.innerHTML=`<div class="notice bad">${esc(/invalid credentials/i.test(error.message)?'Tên đăng nhập hoặc mật khẩu chưa đúng.':error.message)}</div>`}}}catch(error){gate.innerHTML=`<div class="notice bad" style="max-width:650px;margin:22px auto">${esc(error.message)}</div><div class="card panel connection-card"><h2>Kiểm tra lại kết nối</h2><button id="resetAdminEndpoint" class="btn primary" style="width:100%">Bỏ kết nối và nhập URL khác</button></div>${localAdminPanel()}`;$('#resetAdminEndpoint').onclick=resetAdminConnection;bindLocalAdminPanel()}};
  const renderAdminGateBeforePasswordRecovery=renderAdminGate;
  renderAdminGate=async function(){
    await renderAdminGateBeforePasswordRecovery();
@@ -2363,7 +2455,7 @@ function errorText_(err){return String(err&&err.message||err||'Loi Apps Script')
        let endpoint=await driveBridgeEndpoint(),result=await sharedPublicPost({action:'adminLogin',username:account.username,hash},90000);
        saveLocalAdminAccount(account);rememberAdminBinding(account.username,endpoint);
        await saveGatewayLocal({appsScriptUrl:endpoint,appsScriptToken:result.serviceToken||'',folderUrl:result.folderUrl||driveHierarchyRoot(settings)||'',formFolders:{},publicSiteUrl:result.publicSiteUrl||settings.publicSiteUrl||'',autoForms:true,autoApps:true});
-       saveRemoteAdminSession(result.session||'1');state.admin=true;
+       if(result.adminConfig&&window.sf25Config)await window.sf25Config.applyRemote(result.adminConfig,{force:true});saveRemoteAdminSession(result.session||'1');state.admin=true;
        await renderAdminGate();
        try{await pullDriveHierarchy()}catch{}
        showAdminView('dashboard');
@@ -2557,6 +2649,7 @@ function errorText_(err){return String(err&&err.message||err||'Loi Apps Script')
      try{let base=new URL(location.href);base.search='';base.hash='';history.replaceState(null,'',adminShareUrl(endpoint,base.toString()))}catch{}
      await openWorkspaceDatabase(endpoint);saveLocalAdminAccount(account);rememberAdminBinding(account.username,endpoint);
      await saveGatewayLocal({appsScriptUrl:endpoint,appsScriptToken:result.serviceToken||'',folderUrl:result.folderUrl||'',formFolders:{},publicSiteUrl:result.publicSiteUrl||'',autoForms:true,autoApps:true});
+     if(result.adminConfig&&window.sf25Config)await window.sf25Config.applyRemote(result.adminConfig,{force:true});
      saveRemoteAdminSession(result.session||'1');writeUiSession({page:'admin',adminView:'dashboard'});configurePortalMode();
      let syncError='';
      try{await pullDriveHierarchy(progress=>update(progress.message||'Đang lấy dữ liệu mới nhất từ Drive…'))}catch(error){syncError=driveHierarchyError(error)}
@@ -2574,7 +2667,7 @@ function errorText_(err){return String(err&&err.message||err||'Loi Apps Script')
  function renderHybridAdminLogin(){
    let gate=$('#adminGate'),account=localAdminAccount(),hasDefault=!!(account.username&&account.salt&&account.hash);gate.innerHTML=`<div class="card panel connection-card hybrid-login"><h2>Đăng nhập quản trị</h2><p class="auth-subtitle">Chọn nguồn tài khoản bằng ô URL. Hệ thống chỉ kết nối Apps Script khi người quản trị nhập URL.</p><form id="hybridAdminLogin" style="display:grid;gap:14px"><section class="login-zone"><div class="login-zone-head"><div class="login-zone-number">1</div><div><h3>URL của hệ thống cần đăng nhập <span class="optional-label">Không bắt buộc</span></h3><p>Có URL: kiểm tra tài khoản admin trên Apps Script đó. Để trống: dùng tài khoản admin mặc định của website.</p></div></div><div class="field"><label>URL Apps Script Drive hoặc liên kết quản trị</label><input name="endpoint" placeholder="Để trống, hoặc dán URL /exec hay liên kết quản trị đã được cấp" autocomplete="off"><div class="field-hint">Không nhập URL Gmail Bridge vào đây.</div></div><div id="adminUrlCheck" class="login-route-status"></div></section><section class="login-zone"><div class="login-zone-head"><div class="login-zone-number">2</div><div><h3>Tài khoản quản trị</h3><p>Nhập tài khoản thuộc URL phía trên; nếu URL trống, nhập tài khoản admin mặc định.</p></div></div><div class="formgrid"><div class="field full"><label>Tên đăng nhập</label><input name="username" value="${esc(hasDefault?account.username:'')}" autocomplete="username" required></div><div class="field full"><label>Mật khẩu</label><input name="password" type="password" autocomplete="current-password" required></div></div></section><button class="btn primary" type="submit" style="width:100%">Đăng nhập quản trị</button></form><div id="hybridAdminProgress" role="status" aria-live="polite" style="margin-top:13px"></div>${hasDefault?'':`<details class="default-admin-setup" open><summary>Chưa có tài khoản admin mặc định? Tạo lần đầu tại đây</summary><form id="defaultAdminSetup" class="formgrid" style="padding:15px"><div class="field full"><label>Tên đăng nhập mặc định</label><input name="username" minlength="3" autocomplete="username" required></div><div class="field"><label>Mật khẩu</label><input name="password" type="password" minlength="8" autocomplete="new-password" required></div><div class="field"><label>Nhập lại mật khẩu</label><input name="password2" type="password" minlength="8" autocomplete="new-password" required></div><div class="field full"><button class="btn secondary" style="width:100%">Tạo admin mặc định</button></div></form><div id="defaultAdminProgress" style="padding:0 15px 15px"></div></details>`}</div>`;
    let form=$('#hybridAdminLogin'),endpointInput=form.elements.endpoint,urlCheck=$('#adminUrlCheck');endpointInput.onchange=async()=>{let raw=endpointInput.value.trim();if(!raw){urlCheck.innerHTML='<div class="notice">Đang chọn chế độ <b>admin mặc định</b>.</div>';return}let endpoint=resolveAdminEndpointInput(raw);if(!endpoint){urlCheck.innerHTML='<div class="notice warn">URL chưa đúng; hãy dùng URL <b>/exec</b> hoặc liên kết quản trị đã được cấp.</div>';return}urlCheck.innerHTML='<div class="notice">Đang kiểm tra tài khoản tại URL…</div>';try{let status=await remoteAdminStatusAt(endpoint);form.elements.username.value=status.username||'';urlCheck.innerHTML=`<div class="notice ok">Đã tìm thấy tài khoản admin <b>${esc(status.username||'')}</b> tại URL này.</div>`}catch(error){urlCheck.innerHTML=`<div class="notice warn">${esc(error.message)}</div>`}};endpointInput.onchange();
-   form.onsubmit=async event=>{event.preventDefault();if(form.dataset.submitting==='1')return;form.dataset.submitting='1';let data=collectForm(form),button=event.submitter||form.querySelector('button[type="submit"]'),box=$('#hybridAdminProgress');button.disabled=true;button.textContent='Đang kiểm tra…';box.innerHTML='';try{if(data.endpoint){await loginRemoteAdminFromBase(data.endpoint,data.username,data.password);return}let current=localAdminAccount();if(!current.username)throw new Error('Chưa có tài khoản admin mặc định. Hãy tạo tài khoản mặc định ở phần bên dưới.');let hash=await passwordHash(data.password,current.salt,current.it||180000);if(data.username.trim()!==current.username||hash!==current.hash)throw new Error('Tên đăng nhập hoặc mật khẩu admin mặc định không chính xác.');state.admin=true;await renderAdminGate()}catch(error){button.disabled=false;button.textContent='Đăng nhập quản trị';box.innerHTML=`<div class="notice bad">${esc(/invalid credentials/i.test(error.message)?'Tên đăng nhập hoặc mật khẩu của URL này không chính xác.':error.message)}</div>`}finally{delete form.dataset.submitting;button.disabled=false;button.textContent='Đăng nhập quản trị'}};
+   form.onsubmit=async event=>{event.preventDefault();if(form.dataset.submitting==='1')return;form.dataset.submitting='1';let data=collectForm(form),button=event.submitter||form.querySelector('button[type="submit"]'),box=$('#hybridAdminProgress');button.disabled=true;button.textContent='Đang kiểm tra…';box.innerHTML='';try{if(data.endpoint){await loginRemoteAdminFromBase(data.endpoint,data.username,data.password);return}let current=localAdminAccount();if(!current.username)throw new Error('Chưa có tài khoản admin mặc định. Hãy tạo tài khoản mặc định ở phần bên dưới.');let hash=await passwordHash(data.password,current.salt,current.it||180000);if(data.username.trim()!==current.username||hash!==current.hash)throw new Error('Tên đăng nhập hoặc mật khẩu admin mặc định không chính xác.');if(window.sf25Config)await window.sf25Config.openBound(current);state.admin=true;await renderAdminGate()}catch(error){button.disabled=false;button.textContent='Đăng nhập quản trị';box.innerHTML=`<div class="notice bad">${esc(/invalid credentials/i.test(error.message)?'Tên đăng nhập hoặc mật khẩu của URL này không chính xác.':error.message)}</div>`}finally{delete form.dataset.submitting;button.disabled=false;button.textContent='Đăng nhập quản trị'}};
    let setup=$('#defaultAdminSetup');if(setup)setup.onsubmit=async event=>{event.preventDefault();let data=collectForm(setup),box=$('#defaultAdminProgress'),button=event.submitter||setup.querySelector('button');if(data.password!==data.password2){box.innerHTML='<div class="notice bad">Hai lần nhập mật khẩu không khớp.</div>';return}button.disabled=true;button.textContent='Đang tạo…';let salt=arrayBufferToBase64(crypto.getRandomValues(new Uint8Array(24)).buffer),hash=await passwordHash(data.password,salt),next={username:data.username.trim(),salt,hash,it:180000};saveLocalAdminAccount(next);state.admin=true;await renderAdminGate()};installPasswordVisibility(gate)
  }
 
@@ -4732,13 +4825,14 @@ window.sf17Shorten=shortenLink;
   return`https://drive.google.com/drive/folders/${match[1]}${key?'?resourcekey='+encodeURIComponent(key):''}`;
  }
  function compactDeploymentId(endpoint){return safeText(endpoint).match(/\/s\/([-\w]+)\/exec/i)?.[1]||''}
- function portalLink(endpoint,site,view){
+ function portalLink(endpoint,site,view,folder=''){
   const normalizedEndpoint=normalizeAppsScript(endpoint),base=normalizeSite(site)||(/^https?:$/.test(location.protocol)?location.href:'');
   if(!normalizedEndpoint||!base)return'';
   try{
    const u=new URL(base);u.search='';u.hash='';u.searchParams.set('view',view);
    const id=compactDeploymentId(normalizedEndpoint);
    if(id)u.searchParams.set('sf',id);else u.searchParams.set('sf_service',normalizedEndpoint);
+   if(view==='parent'&&folder)u.searchParams.set('sf_folder',folder);
    return u.toString();
   }catch{return''}
  }
@@ -4916,7 +5010,7 @@ window.sf17Shorten=shortenLink;
 
  async function renderDriveLinks(){
   const pane=q('#av-drive');if(!pane)return;
-  const d=await getDriveData(),forms=await idbAll('forms'),apps=await idbAll('apps'),endpoint=normalizeAppsScript(d.appsScriptUrl),site=normalizeSite(d.publicSiteUrl)||(/\.github\.io$/i.test(location.hostname)?normalizeSite(location.href):''),parent=portalLink(endpoint,site,'parent'),admin=portalLink(endpoint,site,'admin'),saved=String(d.parentShortLink||''),savedSource=String(d.parentShortSource||''),stale=!!saved&&!!savedSource&&savedSource!==parent;
+  const d=await getDriveData(),forms=await idbAll('forms'),apps=await idbAll('apps'),endpoint=normalizeAppsScript(d.appsScriptUrl),site=normalizeSite(d.publicSiteUrl)||(/\.github\.io$/i.test(location.hostname)?normalizeSite(location.href):''),parent=portalLink(normalizeAppsScript(d.driveServices?.public?.appsScriptUrl||d.driveServices?.public?.url)||endpoint,site,'parent',d.folderUrl),admin=portalLink(endpoint,site,'admin'),saved=String(d.parentShortLink||''),savedSource=String(d.parentShortSource||''),stale=!!saved&&savedSource!==parent;
   const folderLink=d.folderUrl||'';
   pane.innerHTML=`
    <div class="sectionHead"><div><h2>Quản lý Drive &amp; liên kết</h2><p>Quản lý các link sử dụng và thao tác đồng bộ. Cấu hình Gmail/Drive nằm trong mục “Thiết lập hệ thống”.</p></div></div>
@@ -4952,27 +5046,43 @@ window.sf17Shorten=shortenLink;
  async function requestShort(service,longUrl,alias){
   const params=new URLSearchParams({format:'json',url:longUrl});if(alias)params.set('shorturl',alias);const url=service+'?'+params.toString();let data;
   try{data=await jsonpShort(url)}catch(jsonpError){
-   try{const response=await fetch(url,{mode:'cors',cache:'no-store'});data=await response.json()}catch(fetchError){throw new Error(String(fetchError?.message||jsonpError?.message||'Không kết nối được dịch vụ rút gọn.'))}
+   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),8000);try{const response=await fetch(url,{mode:'cors',cache:'no-store',signal:controller.signal});data=await response.json()}catch(fetchError){throw new Error('Không kết nối được dịch vụ rút gọn trực tiếp. Hãy cập nhật mã Ghi & tài khoản để tạo link qua Apps Script.')}finally{clearTimeout(timer)}
   }
-  if(data?.shorturl)return String(data.shorturl);
+  if(/^https:\/\/(is\.gd|v\.gd)\/[A-Za-z0-9_]+$/.test(String(data?.shorturl||'')))return String(data.shorturl);
   const code=Number(data?.errorcode||0),message=String(data?.errormessage||'');
-  if(code===2){const error=new Error(message||'Tên link đã được sử dụng.');error.code='TAKEN';throw error}
+  if(code===2){const error=new Error('Tên link đã được dùng hoặc không được dịch vụ chấp nhận. Hãy chọn tên khác.');error.code='ALIAS';throw error}
   if(code===3){const error=new Error('Dịch vụ đang giới hạn số lần tạo link. Hãy thử lại sau khoảng một phút.');error.code='RATE';throw error}
   if(code===1)throw new Error('Link phụ huynh gốc không hợp lệ hoặc chưa được công khai.');
   throw new Error(message||'Dịch vụ không trả về link rút gọn.');
  }
- async function shorten(longUrl,alias){
-  if(!/^https?:\/\//i.test(longUrl))throw new Error('Link phụ huynh phải bắt đầu bằng http:// hoặc https://.');
-  let last='';for(const service of ['https://is.gd/create.php','https://v.gd/create.php']){try{return{short:await requestShort(service,longUrl,alias),service:service.includes('is.gd')?'is.gd':'v.gd'}}catch(error){if(error.code==='TAKEN')throw error;last=String(error?.message||error)}}throw new Error(last||'Chưa tạo được link rút gọn.');
+ async function shorten(longUrl,alias,force=false){
+  const target=new URL(longUrl);
+  if(target.protocol!=='https:'||target.username||target.password||target.searchParams.get('view')!=='parent')throw new Error('Hãy dùng link phụ huynh HTTPS do hệ thống tạo.');
+  if([...target.searchParams.keys()].some(key=>!['view','sf','sf_service','sf_folder'].includes(key)))throw new Error('Link phụ huynh chứa tham số không hợp lệ. Hãy làm mới liên kết.');
+  if(alias&&!/^[a-z0-9_]{5,30}$/.test(alias))throw new Error('Tên link cần 5–30 chữ thường, số hoặc dấu gạch dưới.');
+  let bridgeError;
+  try{if(window.sf25Config)return await window.sf25Config.shorten(target.toString(),alias,force)}
+  catch(error){
+   if(error.code||/CONFIG_CONFLICT|tài khoản khác|Token không khớp|unauthorized/i.test(String(error.message)))throw error;
+   bridgeError=error;
+  }
+  // Tương thích với Writer cũ. Việc gọi qua Writer mới không phụ thuộc CORS của dịch vụ.
+  let last='';
+  for(const service of ['https://is.gd/create.php','https://v.gd/create.php']){
+   try{return{short:await requestShort(service,target.toString(),alias),service:service.includes('is.gd')?'is.gd':'v.gd',cloudSaved:false}}
+   catch(error){if(['TAKEN','ALIAS','RATE'].includes(error.code))throw error;last=String(error?.message||error)}
+  }
+  throw new Error(bridgeError?window.sf25Config.userError(bridgeError)+' Nếu đã cập nhật, hãy kiểm tra quyền kết nối của Apps Script.':last||'Chưa tạo được link rút gọn. Link phụ huynh gốc vẫn dùng được.');
  }
  async function drawShortPanel(data){
   const body=q('#sf18ShortBody');if(!body)return;const parent=safeText(data.parent||''),saved=safeText(data.saved||''),stale=!!data.stale;
-  if(saved&&!stale){body.innerHTML=`<div class="sf18-short-link">${html(saved)}</div><div class="sf18-link-row"><button class="btn primary" type="button" id="sf18ShortCopy">Sao chép link</button><a class="btn secondary btn-link" href="${html(saved)}" target="_blank" rel="noopener">Mở thử ↗</a><button class="btn ghost" type="button" id="sf18ShortNew">Tạo link khác</button></div><div class="sf18-short-msg" id="sf18ShortMsg">Link này đang được lưu cố định trong hệ thống.</div>`;
+  if(saved&&!stale&&!data.editing){body.innerHTML=`<div class="sf18-short-link">${html(saved)}</div><div class="sf18-link-row"><button class="btn primary" type="button" id="sf18ShortCopy">Sao chép link</button><a class="btn secondary btn-link" href="${html(saved)}" target="_blank" rel="noopener">Mở thử ↗</a><button class="btn ghost" type="button" id="sf18ShortNew">Tạo link khác</button></div><div class="sf18-short-msg" id="sf18ShortMsg">Link này đang được lưu cố định trong hệ thống.</div>`;
    q('#sf18ShortCopy').onclick=async()=>{const b=q('#sf18ShortCopy');b.textContent=await copyText(saved)?'Đã sao chép':'Không sao chép được';setTimeout(()=>{if(b.isConnected)b.textContent='Sao chép link'},1600)};
-   q('#sf18ShortNew').onclick=async()=>{if(!confirm('Tạo một link rút gọn khác? Link cũ vẫn tiếp tục hoạt động.'))return;await saveShortData({parentShortLink:'',parentShortName:'',parentShortSource:''});await drawShortPanel({parent,saved:'',savedSource:'',stale:false})};return;
+   q('#sf18ShortNew').onclick=async()=>{if(!confirm('Tạo một link rút gọn khác? Link cũ vẫn tiếp tục hoạt động.'))return;await drawShortPanel({...data,editing:true})};return;
   }
-  body.innerHTML=`${stale?'<div class="notice warn" style="margin-top:10px">Link đã lưu đang trỏ tới link phụ huynh cũ.</div>':''}<div class="sf18-link-row sf18-alias"><input id="sf18Alias" maxlength="30" placeholder="Tên link, ví dụ: hosotruongabc"><button class="btn primary" type="button" id="sf18ShortMake" ${parent?'':'disabled'}>Tạo link rút gọn</button></div><div class="field-hint">Tên link gồm chữ thường, số hoặc dấu gạch dưới, dài 5–30 ký tự. Để trống để hệ thống tự sinh.</div><div class="sf18-short-msg" id="sf18ShortMsg">${parent?'':'Hãy hoàn tất Thiết lập hệ thống trước để tạo link phụ huynh.'}</div>`;
-  q('#sf18ShortMake')?.addEventListener('click',async event=>{const button=event.currentTarget,msg=q('#sf18ShortMsg'),aliasInput=q('#sf18Alias');let alias=cleanAlias(aliasInput.value);if(aliasInput.value.trim()&&alias.length<5){msg.innerHTML='<span style="color:var(--bad)">Tên link phải có ít nhất 5 ký tự.</span>';return}button.disabled=true;button.textContent='Đang tạo…';msg.textContent='Đang gửi yêu cầu tới is.gd/v.gd…';try{const result=await shorten(parent,alias);await saveShortData({parentShortLink:result.short,parentShortName:alias,parentShortSource:parent,parentShortAt:new Date().toISOString()});await drawShortPanel({parent,saved:result.short,savedSource:parent,stale:false})}catch(error){if(error.code==='TAKEN'){const suggestion=(alias||'smartforms')+Math.floor(Math.random()*90+10);aliasInput.value=suggestion;msg.innerHTML='<span style="color:var(--bad)">Tên link đã được sử dụng.</span> Hệ thống đã gợi ý tên mới, bấm tạo lại.'}else msg.innerHTML='<span style="color:var(--bad)">'+html(error?.message||error)+'</span>'}finally{if(button.isConnected){button.disabled=!parent;button.textContent='Tạo link rút gọn'}}});
+  body.innerHTML=`${data.editing&&saved?'<div class="notice">Link hiện tại vẫn được giữ cho tới khi tạo link mới thành công. <button class="btn ghost" type="button" id="sf25CancelShort">Quay lại link đang dùng</button></div>':''}${stale?'<div class="notice warn" style="margin-top:10px">Link đã lưu đang trỏ tới link phụ huynh cũ.</div>':''}<div class="sf18-link-row sf18-alias"><input id="sf18Alias" maxlength="30" placeholder="Tên link, ví dụ: hosotruongabc"><button class="btn primary" type="button" id="sf18ShortMake" ${parent?'':'disabled'}>Tạo link rút gọn</button></div><div class="field-hint">Tên link gồm chữ thường, số hoặc dấu gạch dưới, dài 5–30 ký tự. Để trống để hệ thống tự sinh.</div><div class="sf18-short-msg" id="sf18ShortMsg">${parent?'':'Hãy hoàn tất Thiết lập hệ thống trước để tạo link phụ huynh.'}</div>`;
+  q('#sf25CancelShort')?.addEventListener('click',()=>drawShortPanel({...data,editing:false}));
+  q('#sf18ShortMake')?.addEventListener('click',async event=>{const button=event.currentTarget,msg=q('#sf18ShortMsg'),aliasInput=q('#sf18Alias');let alias=cleanAlias(aliasInput.value);if(aliasInput.value.trim()&&alias.length<5){msg.innerHTML='<span style="color:var(--bad)">Tên link phải có ít nhất 5 ký tự.</span>';return}button.disabled=true;button.textContent='Đang tạo…';msg.textContent='Đang tạo và lưu link phụ huynh…';try{const result=await shorten(parent,alias,!!saved);await saveShortData({parentShortLink:result.short,parentShortName:alias,parentShortSource:parent,parentShortAt:new Date().toISOString()});await drawShortPanel({parent,saved:result.short,savedSource:parent,stale:false})}catch(error){if(['TAKEN','ALIAS'].includes(error.code)){const suggestion=(alias||'smartforms').slice(0,28)+Math.floor(Math.random()*90+10);aliasInput.value=suggestion;msg.innerHTML='<span style="color:var(--bad)">Tên link đã được dùng hoặc không được dịch vụ chấp nhận.</span> Hệ thống đã gợi ý tên mới, bấm tạo lại.'}else msg.innerHTML='<span style="color:var(--bad)">'+html(error?.message||error)+'</span>'}finally{if(button.isConnected){button.disabled=!parent;button.textContent='Tạo link rút gọn'}}});
  }
 
  function sf18ShowAdminView(view){
@@ -5567,19 +5677,19 @@ window.sf17Shorten=shortenLink;
  ];
  const ACTION_ROLE={
   driveSync:'write',driveHealth:'write',formUnregister:'write',driveDeleteForm:'write',driveDeleteApp:'write',
-  adminStatus:'write',adminLogin:'write',adminPasswordReset:'write',adminAccountSet:'write',bridgeHealth:'write',
+  adminStatus:'write',adminLogin:'write',adminPasswordReset:'write',adminAccountSet:'write',bridgeHealth:'write',adminConfigGet:'write',adminConfigSave:'write',adminShortenLink:'write',
   driveList:'read',driveItem:'read',adminCatalog:'read',driveHas:'read',
   publicCatalog:'public',publicForm:'public',publicWordTemplate:'public',publicHas:'public',publicLookup:'public',publicIdentitySearch:'public',publicUpload:'public',publicHealth:'public'
  };
  const FOLDER_ACTIONS=new Set(['publicCatalog','publicForm','publicWordTemplate','publicHas','publicLookup','publicIdentitySearch','publicUpload','driveList','driveItem','driveHas','driveHealth','adminCatalog']);
  const DRIVE_ACTIONS=new Set([...Object.keys(ACTION_ROLE),'requestStatus','publicRequestStatus']);
  const ROLE_ACTIONS={
-  write:{get:['publicHealth','publicCatalog','publicRequestStatus','adminStatus','publicLookup','publicForm','publicWordTemplate','publicHas','bridgeHealth','requestStatus','driveHealth','driveHas'],post:['publicUpload','publicIdentitySearch','adminLogin','adminPasswordReset','adminAccountSet','driveSync','formUnregister','driveDeleteForm','driveDeleteApp']},
+  write:{get:['adminConfigGet','driveList','driveItem','adminCatalog','publicHealth','publicCatalog','publicRequestStatus','adminStatus','publicLookup','publicForm','publicWordTemplate','publicHas','bridgeHealth','requestStatus','driveHealth','driveHas'],post:['adminConfigSave','adminShortenLink','publicUpload','publicIdentitySearch','adminLogin','adminPasswordReset','adminAccountSet','driveSync','formUnregister','driveDeleteForm','driveDeleteApp']},
   read:{get:['publicHealth','publicCatalog','publicRequestStatus','publicLookup','publicForm','publicWordTemplate','publicHas','bridgeHealth','requestStatus','adminCatalog','driveHas','driveList','driveItem'],post:[]},
   public:{get:['publicHealth','publicCatalog','publicRequestStatus','publicLookup','publicForm','publicWordTemplate','publicHas','bridgeHealth','requestStatus'],post:['publicUpload','publicIdentitySearch']}
  };
  const rawJsonp=window.jsonp,rawFetch=typeof window.fetch==='function'?window.fetch.bind(window):null;
- let routingCache=null,routingPromise=null;
+ let routingCache=null,routingPromise=null,routingWorkspace='',routingVersion=0;
  const pendingRoles=new Map();
 
  function normalizeUrl(value){
@@ -5603,15 +5713,18 @@ window.sf17Shorten=shortenLink;
   return{...d,id:'drive',legacyUrl,legacyToken,appsScriptUrl:legacyUrl,appsScriptToken:legacyToken,publicSiteUrl:text(d.publicSiteUrl),folderUrl:normalizeFolder(d.folderUrl||Object.values(d.formFolders||{}).find(Boolean)||''),formFolders:{...(d.formFolders||{})},autoForms:d.autoForms!==false,autoApps:d.autoApps!==false,services};
  }
  async function routingData(){
-  if(routingCache)return routingCache;
-  if(routingPromise)return routingPromise;
-  routingPromise=(async()=>{let raw={};try{raw=await idbGet('settings','drive')||{}}catch{}routingCache=normalizeDriveData(raw);routingPromise=null;return routingCache})();
-  return routingPromise;
+  const workspace=DB?.name||'';if(workspace!==routingWorkspace){invalidateRouting();routingWorkspace=workspace}
+  if(routingCache)return routingCache;if(routingPromise)return routingPromise;
+  const version=routingVersion;
+  const promise=(async()=>{const raw=await idbGet('settings','drive')||{},data=normalizeDriveData(raw);if(version===routingVersion){routingCache=data;routingPromise=null}return data})();
+  routingPromise=promise;try{return await promise}catch(error){if(version===routingVersion)routingPromise=null;throw error}
  }
- function invalidateRouting(){routingCache=null;routingPromise=null}
+ function invalidateRouting(){routingCache=null;routingPromise=null;routingVersion++}
  async function routeFor(action,fallback,params={}){
   const data=await routingData(),forced=text(params.sfRole||''),pending=params.requestId?pendingRoles.get(text(params.requestId)):'';
-  const role=forced||pending||ACTION_ROLE[action]||'write',service=data.services[role]||data.services.write||{};
+  if(pending)return pending;
+  if(['adminStatus','adminLogin','adminPasswordReset'].includes(action)&&normalizeUrl(fallback))return{role:'write',url:normalizeUrl(fallback),token:'',folder:''};
+  const role=forced||ACTION_ROLE[action]||'write',service=data.services[role]||data.services.write||{};
   const fallbackUrl=normalizeUrl(fallback),url=service.url||fallbackUrl||data.legacyUrl,token=service.token||data.legacyToken||text(params.token).trim(),folder=data.folderUrl||locationFolder();
   return{role,url,token,folder};
  }
@@ -5621,7 +5734,7 @@ window.sf17Shorten=shortenLink;
   window.jsonp=async function(endpoint,params={},timeout=25000){
    const action=text(params.action);if(!DRIVE_ACTIONS.has(action))return rawJsonp(endpoint,params,timeout);
    const route=await routeFor(action,endpoint,params),next={...params};
-   if(route.token)next.token=route.token;
+   if(route.token&&!/^public/.test(action))next.token=route.token;else if(/^public/.test(action))delete next.token;
    if(route.folder&&!next.folder&&FOLDER_ACTIONS.has(action))next.folder=route.folder;
    const result=await rawJsonp(route.url||endpoint,next,timeout);
    if((action==='requestStatus'||action==='publicRequestStatus')&&params.requestId&&!result?.pending)pendingRoles.delete(text(params.requestId));
@@ -5634,9 +5747,9 @@ window.sf17Shorten=shortenLink;
    let payload=null;try{if(typeof init.body==='string')payload=JSON.parse(init.body)}catch{}
    if(!payload||!DRIVE_ACTIONS.has(text(payload.action)))return rawFetch(input,init);
    const inputUrl=typeof input==='string'?input:(input?.url||''),route=await routeFor(payload.action,inputUrl,payload),nextPayload={...payload};
-   if(route.token)nextPayload.token=route.token;
+   if(route.token&&!/^public/.test(text(payload.action)))nextPayload.token=route.token;else if(/^public/.test(text(payload.action)))delete nextPayload.token;
    if(route.folder&&!nextPayload.folder&&FOLDER_ACTIONS.has(text(payload.action)))nextPayload.folder=route.folder;
-   if(nextPayload.requestId)pendingRoles.set(text(nextPayload.requestId),route.role);
+   if(nextPayload.requestId)pendingRoles.set(text(nextPayload.requestId),{...route});
    const nextInit={...init,body:JSON.stringify(nextPayload)};
    return rawFetch(route.url||input,nextInit);
   };
@@ -5645,7 +5758,7 @@ window.sf17Shorten=shortenLink;
  function buildDriveModuleCode(role){
   let source=text(window.DRIVE_HIERARCHY_APPS_SCRIPT);
   const roleHeader='/* ST SmartForms Drive module · '+role+' · mỗi dự án chỉ nhận nhóm tác vụ được cấp */\nconst SF_SERVICE_ROLE='+JSON.stringify(role)+';\nconst SF_ROLE_ACTIONS='+JSON.stringify(ROLE_ACTIONS)+';\nfunction sfRoleAllows_(method,action){if(SF_SERVICE_ROLE===\'all\')return true;const set=SF_ROLE_ACTIONS[SF_SERVICE_ROLE]||SF_ROLE_ACTIONS.write;return (set[method]||[]).indexOf(String(action||\'\'))>=0;}\n';
-  if(!source.includes('SF_SERVICE_ROLE')){
+  if(!source.includes('const _sfProbeId=')){
    source=source.replace('function doPost(e){','function doPost(e){\n  let _sfProbe;try{_sfProbe=JSON.parse((e.postData&&e.postData.contents)||\'{}\')}catch(_sfErr){return ContentService.createTextOutput(\'invalid json\')}const _sfProbeId=requestId_(_sfProbe.requestId);if(!sfRoleAllows_(\'post\',_sfProbe.action))return requestText_(_sfProbeId,false,\'action not assigned to \'+SF_SERVICE_ROLE);');
    source=source.replace('function doGet(e){','function doGet(e){\n  const _sfQ=e.parameter||{},_sfCb=/^[A-Za-z_$][\\w$.]*$/.test(_sfQ.callback||\'\')?_sfQ.callback:\'cb\';if(!sfRoleAllows_(\'get\',_sfQ.action))return jsonp_(_sfCb,{ok:false,error:\'action not assigned to \'+SF_SERVICE_ROLE});');
   }
@@ -5664,15 +5777,15 @@ window.sf17Shorten=shortenLink;
  async function renderSystemMulti(){
   const pane=q('#av-system');if(!pane)return;pane.classList.remove('hidden');
   const gmail=await idbGet('settings','gmail_bridge_v1')||await idbGet('settings','gmail')||{},driveRaw=await idbGet('settings','drive')||{},drive=normalizeDriveData(driveRaw),gmailCode=text(window.GMAIL_BRIDGE_CODE),selected=MODULES[0];
-  const gmailUrl=normalizeUrl(gmail.appsScriptUrl||gmail.endpoint),driveReady=!!(drive.legacyUrl&&drive.legacyToken&&drive.folderUrl),sameUrl=gmailUrl&&drive.legacyUrl&&gmailUrl===drive.legacyUrl;
-  const rows=MODULES.map(module=>{const item=drive.services[module.key],shownUrl=item.explicitUrl||(module.key==='write'?drive.legacyUrl:'');return'<div class="sf22-module"><div class="sf22-module-head"><div><b>'+module.number+' · '+html(module.short)+'</b><small>'+html(module.desc)+'</small></div>'+moduleStatus(drive,module)+'</div><label>URL Web App /exec</label><input name="'+module.key+'Url" value="'+html(shownUrl)+'" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off"><label>SMARTFORMS_DRIVE_TOKEN</label>'+passRow(module.key+'Token',item.explicitToken||(module.key==='write'?drive.legacyToken:''),'Token riêng của dự án '+module.short)+'</div>'}).join('');
-  pane.innerHTML='<div class="sectionHead"><div><h2>Thiết lập hệ thống</h2><p>Hai khối chính được xếp thành <b>hai dòng riêng biệt</b> trên desktop, tablet và điện thoại. Gmail giữ một dự án riêng; SmartForms Drive được tách theo luồng ghi, đọc và phụ huynh.</p></div></div>'+(sameUrl?'<div class="notice bad" style="margin-bottom:14px">URL Gmail đang trùng URL SmartForms Drive. Hãy dùng hai dự án Apps Script khác nhau.</div>':'')+'<div class="sf22-grid">'+
-   '<section class="card panel sf22-card"><div class="sf22-head"><span class="sf22-num">01</span><div><h3>SmartForms Gmail</h3><p>Tạo bản nháp Gmail kèm PDF hồ sơ và theo dõi trạng thái Boomerang.</p></div><span class="badge '+(gmailUrl&&gmail.appsScriptToken?'ok':'warn')+'">'+(gmailUrl&&gmail.appsScriptToken?'Đã cấu hình':'Chưa cấu hình')+'</span></div>'+
+  const gmailUrl=normalizeUrl(gmail.appsScriptUrl||gmail.endpoint),gmailToken=text(gmail.appsScriptToken||gmail.token).trim(),driveReady=!!(drive.legacyUrl&&drive.legacyToken&&drive.folderUrl),sameUrl=gmailUrl&&drive.legacyUrl&&gmailUrl===drive.legacyUrl;
+  const rows=MODULES.map(module=>{const item=drive.services[module.key],shownUrl=item.ownUrl||(module.key==='write'?drive.legacyUrl:'');return'<div class="sf22-module"><div class="sf22-module-head"><div><b>'+module.number+' · '+html(module.short)+'</b><small>'+html(module.desc)+'</small></div>'+moduleStatus(drive,module)+'</div><label>URL Web App /exec</label><input name="'+module.key+'Url" value="'+html(shownUrl)+'" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off"><label>SMARTFORMS_DRIVE_TOKEN</label>'+passRow(module.key+'Token',item.ownToken||(module.key==='write'?drive.legacyToken:''),'Token riêng của dự án '+module.short)+'</div>'}).join('');
+  pane.innerHTML='<div class="sectionHead"><div><h2>Thiết lập hệ thống</h2><p>Hai khối chính được xếp thành <b>hai dòng riêng biệt</b> trên desktop, tablet và điện thoại. Gmail giữ một dự án riêng; SmartForms Drive được tách theo luồng ghi, đọc và phụ huynh.</p></div></div>'+(sameUrl?'<div class="notice bad" style="margin-bottom:14px">URL Gmail đang trùng URL SmartForms Drive. Hãy dùng hai dự án Apps Script khác nhau.</div>':'')+'<div class="notice" style="margin-bottom:14px">URL và token được giữ sau khi lưu, tải lại trang và đăng nhập lại. Để trống ô URL/token sẽ giữ giá trị đã lưu. Khi có thông báo <b>đã lưu theo tài khoản</b>, cấu hình cũng được lưu trên Apps Script để khôi phục khi đổi máy.</div><details class="setup-guide" style="margin-bottom:14px"><summary>Cập nhật một lần để lưu cấu hình theo tài khoản và rút gọn link</summary><ol><li>Chọn mã <b>01 · Ghi dữ liệu</b> bên dưới, sao chép toàn bộ mã vào đúng dự án Writer hiện tại.</li><li>Lưu mã, chạy <b>setupSmartFormsDrive</b> và cấp quyền nếu Google yêu cầu.</li><li>Vào <b>Triển khai → Quản lý các lượt triển khai → Chỉnh sửa → Phiên bản mới → Triển khai</b>.</li><li>Quay lại đây, bấm <b>Lưu &amp; kiểm tra SmartForms Drive</b>, rồi lưu Gmail nếu đã cấu hình. URL /exec và token cũ được giữ khi cập nhật cùng lượt triển khai.</li></ol></details><div class="sf22-grid">'+
+   '<section class="card panel sf22-card"><div class="sf22-head"><span class="sf22-num">01</span><div><h3>SmartForms Gmail</h3><p>Tạo bản nháp Gmail kèm PDF hồ sơ và theo dõi trạng thái Boomerang.</p></div><span class="badge '+(gmailUrl&&gmailToken?'ok':'warn')+'">'+(gmailUrl&&gmailToken?'Đã cấu hình':'Chưa cấu hình')+'</span></div>'+
    '<ol class="sf22-steps"><li>Tạo dự án <b>SmartForms Gmail</b> riêng.</li><li>Dán mã <b>SF_Gmail.gs</b>, chạy <b>setupSmartFormsGmail</b> và cấp quyền.</li><li>Deploy Web App với <b>Execute as Me · Anyone</b>, sau đó dán URL/token.</li></ol>'+
-   '<form id="sf22GmailForm" class="formgrid"><div class="field full"><label>URL Web App Gmail (/exec)</label><input name="url" value="'+html(gmailUrl)+'" placeholder="https://script.google.com/macros/s/.../exec"></div><div class="field full"><label>SMARTFORMS_GMAIL_TOKEN</label>'+passRow('token',text(gmail.appsScriptToken),'Token trong Nhật ký thực thi')+'</div><div class="field full sf22-actions"><button class="btn primary" type="submit">Lưu &amp; kiểm tra Gmail</button><button class="btn ghost" type="button" id="sf22GmailTest">Chỉ kiểm tra</button></div></form><div id="sf22GmailBox"></div><div class="sf22-code"><div class="sf22-codebar"><b>SF_Gmail.gs</b><span id="sf22GmailSize" class="field-hint"></span><button class="btn secondary" id="sf22CopyGmail" type="button">Sao chép mã Gmail</button></div><textarea id="sf22GmailCode" readonly spellcheck="false"></textarea></div></section>'+
+   '<form id="sf22GmailForm" class="formgrid"><div class="field full"><label>URL Web App Gmail (/exec)</label><input name="url" value="'+html(gmailUrl)+'" placeholder="https://script.google.com/macros/s/.../exec"></div><div class="field full"><label>SMARTFORMS_GMAIL_TOKEN</label>'+passRow('token',gmailToken,'Token trong Nhật ký thực thi')+'</div><div class="field full sf22-actions"><button class="btn primary" type="submit">Lưu &amp; kiểm tra Gmail</button><button class="btn ghost" type="button" id="sf22GmailTest">Chỉ kiểm tra</button></div></form><div id="sf22GmailBox"></div><div class="sf22-code"><div class="sf22-codebar"><b>SF_Gmail.gs</b><span id="sf22GmailSize" class="field-hint"></span><button class="btn secondary" id="sf22CopyGmail" type="button">Sao chép mã Gmail</button></div><textarea id="sf22GmailCode" readonly spellcheck="false"></textarea></div></section>'+
    '<section class="card panel sf22-card"><div class="sf22-head"><span class="sf22-num">02</span><div><h3>SmartForms Drive</h3><p>Ba dự án dùng chung một thư mục mẹ. Tài khoản quản trị và recovery vẫn nằm ở dự án <b>Ghi &amp; tài khoản</b> để dữ liệu xác minh không bị tách rời.</p></div><span class="badge '+(driveReady?'ok':'warn')+'">'+(driveReady?'Đã cấu hình':'Chưa cấu hình')+'</span></div>'+
    '<ol class="sf22-steps"><li>Tạo ba dự án: <b>SmartForms Drive - Write</b>, <b>Read</b> và <b>Public</b>.</li><li>Trong ô chọn mã bên dưới, sao chép đúng mã của từng vai trò vào đúng dự án.</li><li>Ở mỗi dự án chạy <b>setupSmartFormsDrive</b>, cấp quyền Drive và Deploy <b>Me · Anyone</b>.</li><li>Dùng cùng thư mục mẹ; không dùng chung URL/token giữa các dự án.</li><li>Nếu chưa nhập Read/Public, hệ thống tự dùng Writer cũ để giữ tương thích.</li></ol>'+
-   '<form id="sf22DriveForm" class="formgrid"><div class="field full"><label>Thư mục mẹ Google Drive</label><input name="folder" value="'+html(drive.folderUrl)+'" placeholder="https://drive.google.com/drive/folders/..." required></div><div class="field full"><label>Website chính thức của nhà trường</label><input name="site" value="'+html(drive.publicSiteUrl)+'" placeholder="https://ten-truong.github.io/ten-du-an/"></div><div class="field full"><div class="sf22-module-grid">'+rows+'</div></div><div class="field full sf22-actions"><button class="btn primary" type="submit">Lưu &amp; kiểm tra SmartForms Drive</button><button class="btn ghost" type="button" id="sf22DriveSync">Đồng bộ song song</button><button class="btn ghost" type="button" id="sf22DrivePull">Lấy dữ liệu về</button></div></form><div id="sf22DriveBox"></div>'+
+   '<form id="sf22DriveForm" class="formgrid"><div class="field full"><label>Thư mục mẹ Google Drive</label><input name="folder" value="'+html(drive.folderUrl)+'" placeholder="https://drive.google.com/drive/folders/..." required></div><div class="field full"><label>Website chính thức của nhà trường</label><input name="site" value="'+html(drive.publicSiteUrl)+'" placeholder="https://ten-truong.github.io/ten-du-an/"></div><div class="field full"><div class="sf22-module-grid">'+rows+'</div></div><div class="field full sf22-actions"><button class="btn primary" type="submit">Lưu &amp; kiểm tra SmartForms Drive</button><button class="btn ghost" type="button" id="sf22DriveSync">Đồng bộ song song</button><button class="btn ghost" type="button" id="sf22DrivePull">Lấy dữ liệu về</button><button class="btn ghost" type="button" id="sf25RestoreConfig">Lấy cấu hình tài khoản</button></div></form><div id="sf22DriveBox"></div>'+
    '<div class="sf22-code"><div class="sf22-codebar"><label for="sf22CodeRole"><b>Mã dự án cần sao chép</b></label><select id="sf22CodeRole">'+MODULES.map(m=>'<option value="'+m.key+'">'+m.number+' · '+html(m.short)+'</option>').join('')+'</select><span id="sf22DriveSize" class="field-hint"></span><button class="btn secondary" id="sf22CopyDrive" type="button">Sao chép mã</button></div><textarea id="sf22DriveCode" readonly spellcheck="false"></textarea><div class="field-hint">Đây là mã đầy đủ có bộ lọc vai trò. Mỗi dự án chỉ nhận các action của vai trò đã chọn; phần dữ liệu dùng chung được đọc từ metadata trong Drive để Read/Public không phụ thuộc Script Properties của Writer.</div></div></section></div>'+
    '<div class="setup-guide sf22-foot"><b>Nguyên tắc vận hành:</b> Write xử lý ghi và tài khoản, Read xử lý lấy dữ liệu, Public xử lý truy cập phụ huynh. Việc tách này giảm tranh chấp hàng đợi; tốc độ thực tế còn phụ thuộc hạn mức Google Apps Script, dung lượng tệp và số lượt đồng thời.</div>';
 
@@ -5683,9 +5796,74 @@ window.sf17Shorten=shortenLink;
   const refreshCode=()=>{const value=buildDriveModuleCode(roleSelect.value);codeArea.value=value;q('#sf22DriveSize').textContent=value.split('\n').length+' dòng'};
   roleSelect.onchange=refreshCode;refreshCode();copyD.onclick=async()=>{copyD.textContent=await copy(codeArea.value)?'Đã sao chép ✓':'Không sao chép được';setTimeout(()=>{if(copyD.isConnected)copyD.textContent='Sao chép mã'},1600)};
 
-  q('#sf22GmailForm').onsubmit=async event=>{event.preventDefault();const form=event.currentTarget,done=busy(event.submitter,'Đang kiểm tra…');try{const url=normalizeUrl(form.url.value),token=form.token.value.trim();if(!url)throw new Error('URL Gmail chưa đúng.');if(!token)throw new Error('Chưa nhập SMARTFORMS_GMAIL_TOKEN.');if(url===drive.legacyUrl)throw new Error('URL này đang là dự án Drive. Gmail phải dùng dự án riêng.');if(window.sfGmailBridge?.save)await window.sfGmailBridge.save({appsScriptUrl:url,appsScriptToken:token});else await idbPut('settings',{...(await idbGet('settings','gmail_bridge_v1')||{}),id:'gmail_bridge_v1',appsScriptUrl:url,appsScriptToken:token});box('sf22GmailBox','Đã lưu cấu hình Gmail.','ok')}catch(error){box('sf22GmailBox',html(error?.message||error),'bad')}finally{done()}};
+  function readSavedField(input,initial,current,{url=false}={}){
+   const value=text(input.value).trim();
+   if(!value||value===(input.dataset.sf25Saved??text(initial).trim()))return text(current).trim();
+   if(url&&!normalizeUrl(value))throw new Error('URL chưa đúng. Hãy dùng URL Web App HTTPS kết thúc bằng /exec.');
+   return url?normalizeUrl(value):value;
+  }
+  async function refreshSavedBadges(){
+   const latest=normalizeDriveData(await idbGet('settings','drive')||{}),gm=await idbGet('settings','gmail_bridge_v1')||{},heads=qa('.sf22-head',pane);
+   const badge=(head,ready)=>{const node=head?.querySelector('.badge');if(node){node.className='badge '+(ready?'ok':'warn');node.textContent=ready?'Đã cấu hình':'Chưa cấu hình'}};
+   badge(heads[0],!!(normalizeUrl(gm.appsScriptUrl)&&gm.appsScriptToken));badge(heads[1],!!(latest.legacyUrl&&latest.legacyToken&&latest.folderUrl));
+   qa('.sf22-module',pane).forEach((node,index)=>{const old=node.querySelector('.sf22-module-head .badge');if(old)old.outerHTML=moduleStatus(latest,MODULES[index])});
+  }
+  q('#sf22GmailForm').onsubmit=async event=>{
+   event.preventDefault();const form=event.currentTarget,done=busy(event.submitter,'Đang lưu…');let saved=false;
+   try{
+    const current=await idbGet('settings','gmail_bridge_v1')||gmail,currentDrive=normalizeDriveData(await idbGet('settings','drive')||{});
+    const url=readSavedField(form.elements.url,gmailUrl,normalizeUrl(current.appsScriptUrl||current.endpoint),{url:true}),token=readSavedField(form.elements.token,gmailToken,current.appsScriptToken||current.token);
+    if(!url)throw new Error('Chưa nhập URL Gmail.');if(!token)throw new Error('Chưa nhập SMARTFORMS_GMAIL_TOKEN.');
+    if(Object.values(currentDrive.services).some(item=>item.url===url))throw new Error('URL Gmail phải thuộc dự án Gmail riêng, không trùng các dịch vụ Drive.');
+    await idbPut('settings',{...current,id:'gmail_bridge_v1',appsScriptUrl:url,appsScriptToken:token});saved=true;
+    form.elements.url.value=url;form.elements.token.value=token;form.elements.url.dataset.sf25Saved=url;form.elements.token.dataset.sf25Saved=token;await refreshSavedBadges();
+    box('sf22GmailBox','Đã lưu trên thiết bị. Đang kiểm tra Gmail và lưu theo tài khoản…');
+    const [health,cloud]=await Promise.allSettled([window.sfGmailBridge.health(),window.sf25Config.saveCloud('gmail')]);
+    const messages=[cloud.status==='fulfilled'?'<b>Đã lưu cấu hình Gmail theo tài khoản.</b>':html(window.sf25Config.userError(cloud.reason))];
+    messages.push(health.status==='fulfilled'?'Gmail đã kết nối'+(health.value?.email?': <b>'+html(health.value.email)+'</b>':'')+'.':'Chưa xác nhận kết nối Gmail: '+html(health.reason?.message||health.reason)+'. URL và token đã nhập vẫn được giữ.');
+    box('sf22GmailBox',messages.join('<br>'),health.status==='fulfilled'&&cloud.status==='fulfilled'?'ok':'warn');
+   }catch(error){box('sf22GmailBox',(saved?'Đã lưu trên thiết bị. ':'')+html(error?.message||error),'bad')}finally{done()}
+  };
   q('#sf22GmailTest').onclick=async event=>{const done=busy(event.currentTarget,'Đang kiểm tra…');try{if(!window.sfGmailBridge?.health)throw new Error('Chưa tải được mô-đun Gmail.');const result=await window.sfGmailBridge.health();box('sf22GmailBox','<b>Gmail đã kết nối.</b>'+(result?.email?' Tài khoản: <b>'+html(result.email)+'</b>.':''),'ok')}catch(error){box('sf22GmailBox',html(error?.message||error),'bad')}finally{done()}};
-  q('#sf22DriveForm').onsubmit=async event=>{event.preventDefault();const form=event.currentTarget,done=busy(event.submitter,'Đang lưu…');try{const folder=normalizeFolder(form.folder.value),site=text(form.site.value).trim(),services={};for(const module of MODULES){const url=normalizeUrl(form.elements[module.key+'Url'].value),token=text(form.elements[module.key+'Token'].value).trim();if((url&&!token)||(!url&&token))throw new Error('Mô-đun '+module.short+' phải có đủ URL và token, hoặc để trống cả hai ô.');services[module.key]={appsScriptUrl:url,appsScriptToken:token}}const writer=services.write,current=await idbGet('settings','drive')||{},legacyUrl=writer.appsScriptUrl||normalizeUrl(current.appsScriptUrl||current.endpoint),legacyToken=writer.appsScriptToken||text(current.appsScriptToken||current.token);if(!legacyUrl||!legacyToken)throw new Error('Hãy cấu hình ít nhất dự án Ghi & tài khoản.');const next={...current,id:'drive',appsScriptUrl:legacyUrl,appsScriptToken:legacyToken,folderUrl:folder,publicSiteUrl:site,autoForms:current.autoForms!==false,autoApps:current.autoApps!==false,driveServices:services};await idbPut('settings',next);for(const item of await idbAll('forms')){if(item.driveFolderUrl!==folder){item.driveFolderUrl=folder;await idbPut('forms',item)}}invalidateRouting();box('sf22DriveBox','Đã lưu ba luồng. Đang kiểm tra quyền ghi của Writer…');const check=window.driveHierarchyHealth;if(typeof check!=='function')throw new Error('Chưa tải được hàm kiểm tra Drive.');const result=await check(folder,{force:true});box('sf22DriveBox','<b>SmartForms Drive đã kết nối.</b>'+(result?.folderName?' Thư mục: <b>'+html(result.folderName)+'</b>.':'')+' Các action đọc/ phụ huynh sẽ được định tuyến sang URL riêng nếu đã nhập.','ok')}catch(error){box('sf22DriveBox',html(error?.message||error),'bad')}finally{done()}};
+  q('#sf22DriveForm').onsubmit=async event=>{
+   event.preventDefault();const form=event.currentTarget,done=busy(event.submitter,'Đang lưu…');let saved=false;
+   try{
+    const current=await idbGet('settings','drive')||{},latest=normalizeDriveData(current),services={...(current.driveServices||{})},gm=await idbGet('settings','gmail_bridge_v1')||{};
+    const folder=normalizeFolder(text(form.elements.folder.value).trim()||latest.folderUrl);if(!folder)throw new Error('Chưa có thư mục mẹ Google Drive.');
+    let site=text(form.elements.site.value).trim()||latest.publicSiteUrl;
+    if(site){let u;try{u=new URL(site)}catch{}if(!u||u.protocol!=='https:'||u.username||u.password)throw new Error('Website chính thức phải là địa chỉ HTTPS công khai.');u.search='';u.hash='';site=u.toString();}
+    for(const module of MODULES){
+     const initial=drive.services[module.key],old=latest.services[module.key],isWriter=module.key==='write';
+     const url=readSavedField(form.elements[module.key+'Url'],initial.ownUrl||(isWriter?drive.legacyUrl:''),old.ownUrl||(isWriter?latest.legacyUrl:''),{url:true});
+     const token=readSavedField(form.elements[module.key+'Token'],initial.ownToken||(isWriter?drive.legacyToken:''),old.ownToken||(isWriter?latest.legacyToken:''));
+     if((url&&!token)||(!url&&token))throw new Error('Mô-đun '+module.short+' cần đủ URL và token. Ô trống chỉ giữ được giá trị nếu trước đó đã lưu.');
+     if(url&&url===normalizeUrl(gm.appsScriptUrl))throw new Error('URL '+module.short+' đang trùng Gmail. Hãy dùng đúng dự án Drive.');
+     services[module.key]={...(services[module.key]||{}),appsScriptUrl:url,appsScriptToken:token};
+    }
+    if(!services.write.appsScriptUrl||!services.write.appsScriptToken)throw new Error('Hãy cấu hình dự án Ghi & tài khoản.');
+    const next={...current,id:'drive',appsScriptUrl:services.write.appsScriptUrl,appsScriptToken:services.write.appsScriptToken,folderUrl:folder,publicSiteUrl:site,autoForms:current.autoForms!==false,autoApps:current.autoApps!==false,driveServices:services};
+    await idbPut('settings',next);saved=true;invalidateRouting();
+    for(const module of MODULES){form.elements[module.key+'Url'].value=services[module.key].appsScriptUrl;form.elements[module.key+'Token'].value=services[module.key].appsScriptToken;form.elements[module.key+'Url'].dataset.sf25Saved=services[module.key].appsScriptUrl;form.elements[module.key+'Token'].dataset.sf25Saved=services[module.key].appsScriptToken;}
+    form.elements.folder.value=folder;form.elements.site.value=site;await refreshSavedBadges();
+    if(folder!==latest.folderUrl)for(const item of await idbAll('forms')){if(item.driveFolderUrl!==folder){item.driveFolderUrl=folder;await idbPut('forms',item)}}
+    box('sf22DriveBox','Đã lưu URL/token trên thiết bị. Đang kiểm tra từng dịch vụ…');
+    const checks=await Promise.allSettled(MODULES.map(async module=>{
+     const item=services[module.key];if(!item.appsScriptUrl)return module.short+': dùng Writer.';
+     const result=await rawJsonp(item.appsScriptUrl,{action:module.key==='write'?'driveHealth':'bridgeHealth',token:item.appsScriptToken,folder},35000);
+     if(!result?.ok)throw new Error(module.short+': '+(result?.error||'chưa kết nối được'));
+     if(result.serviceRole&&result.serviceRole!=='all'&&result.serviceRole!==module.key)throw new Error(module.short+': URL đang triển khai mã của vai trò '+result.serviceRole+'.');
+     return module.short+': đã kết nối.';
+    }));
+    const notes=checks.map(result=>html(result.status==='fulfilled'?result.value:result.reason?.message||result.reason));
+    let cloudOK=false;
+    if(checks[0].status==='fulfilled'){
+     try{box('sf22DriveBox','Đã kiểm tra kết nối. Đang lưu cấu hình theo tài khoản…');await window.sf25Config.saveCloud('drive');cloudOK=true;await window.sf25Config.bindSavedWorkspace();notes.unshift('<b>Đã lưu cấu hình theo tài khoản quản trị.</b> URL/token không tự hết hạn và được khôi phục khi đăng nhập trên máy khác.');}
+     catch(error){notes.unshift(html(window.sf25Config.userError(error)))}
+    }else notes.unshift('<b>Đã lưu trên thiết bị.</b> Chưa lưu lên tài khoản vì chưa kết nối được Writer.');
+    box('sf22DriveBox',notes.join('<br>'),cloudOK&&checks.every(result=>result.status==='fulfilled')?'ok':'warn');
+   }catch(error){box('sf22DriveBox',(saved?'Đã lưu trên thiết bị. ':'')+html(error?.message||error),'bad')}finally{done()}
+  };
+  q('#sf25RestoreConfig').onclick=async event=>{const done=busy(event.currentTarget,'Đang lấy cấu hình…');try{const restored=await window.sf25Config.restoreOnce(true);if(!restored)throw new Error('Tài khoản chưa có cấu hình đã lưu trên Apps Script.');await renderSystemMulti();box('sf22DriveBox','Đã lấy cấu hình đã lưu của tài khoản này.','ok')}catch(error){box('sf22DriveBox',html(error?.message||error),'warn')}finally{done()}};
   q('#sf22DriveSync').onclick=async event=>{const done=busy(event.currentTarget,'Đang đồng bộ…');try{box('sf22DriveBox','Đang đồng bộ song song các mục…');await window.syncAllDriveHierarchy();box('sf22DriveBox','Đã đồng bộ xong các mục qua luồng Ghi.','ok')}catch(error){box('sf22DriveBox',html(error?.message||error),'bad')}finally{done()}};
   q('#sf22DrivePull').onclick=async event=>{const done=busy(event.currentTarget,'Đang lấy…');try{const pull=window.pullDriveHierarchy||window.pullAllV4;if(typeof pull!=='function')throw new Error('Chưa tải được hàm lấy dữ liệu Drive.');const result=await pull();box('sf22DriveBox','Đã lấy dữ liệu mới nhất từ Drive'+(result?.restoredApps!==undefined?': '+html(result.restoredApps)+' hồ sơ, '+html(result.restoredForms)+' biểu mẫu':'')+'.','ok')}catch(error){box('sf22DriveBox',html(error?.message||error),'bad')}finally{done()}};
  }
@@ -5731,6 +5909,7 @@ window.sf17Shorten=shortenLink;
    @media(max-width:620px){#av-system .sf22-head{grid-template-columns:auto minmax(0,1fr)}#av-system .sf22-head .badge{grid-column:2;justify-self:start}#av-system .sf22-actions .btn{flex:1;min-width:145px}#av-system .sf22-codebar .btn{width:100%}}
   `;document.head.appendChild(style)
  }
+ window.sf22InvalidateRouting=invalidateRouting;window.sf22DirectJsonp=rawJsonp;window.sf22DirectFetch=rawFetch;
  window.sf22RenderSystem=renderSystemMulti;window.sf20RenderSystem=renderSystemMulti;window.renderSystemSetup=renderSystemMulti;window.sf22BuildDriveModuleCode=buildDriveModuleCode;
  function boot(){installStyles();if(q('#av-system:not(.hidden)'))renderSystemMulti().catch(error=>console.warn('SmartForms 22',error))}
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
@@ -6245,5 +6424,150 @@ window.sf17Shorten=shortenLink;
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
 })();
 /* ===== Kết thúc SmartForms 23.0 ===== */
+
+/* ===== SmartForms 25 · giữ cấu hình theo tài khoản và rút gọn link qua Writer ===== */
+(function installSmartForms25(){
+ 'use strict';
+ const META='sf25_config_state',IDS=new Set(['drive','gmail_bridge_v1']);
+ const rawGet=idbGet,rawPut=idbPut,queues=new Map(),restored=new Set();
+ const directJsonp=window.sf22DirectJsonp||window.jsonp,directFetch=window.sf22DirectFetch||window.fetch.bind(window);
+ const str=v=>String(v??'').trim();
+ let applying=0,cloudQueue=Promise.resolve();
+ const endpoint=v=>{try{const u=new URL(str(v));return u.protocol==='https:'&&u.hostname==='script.google.com'&&/^\/macros\/s\/[\w-]+\/exec$/.test(u.pathname)?u.origin+u.pathname:''}catch{return''}};
+ const active=()=>typeof isParentPortal!=='function'||!isParentPortal();
+ const sameDb=db=>{if(DB!==db)throw new Error('Tài khoản đang thay đổi. Hãy mở lại cấu hình trước khi lưu.');};
+ const backupKey=db=>'sf25_settings_'+db.name;
+ function backup(db){try{return JSON.parse(localStorage.getItem(backupKey(db))||'{}')}catch{return{}}}
+ function keepCredentials(old,next){
+  const out={...(old||{}),...(next||{})};
+  for(const key of ['appsScriptUrl','appsScriptToken','endpoint','token'])if(!str(out[key])&&str(old?.[key]))out[key]=old[key];
+  if(out.id==='drive'){
+   out.driveServices={...(old?.driveServices||{}),...(next?.driveServices||{})};
+   for(const role of ['write','read','public'])out.driveServices[role]=keepCredentials(old?.driveServices?.[role],next?.driveServices?.[role]);
+  }
+  return out;
+ }
+ function projectDrive(d={}){
+  const out={};for(const key of ['appsScriptUrl','appsScriptToken','folderUrl','publicSiteUrl','autoForms','autoApps','parentShortLink','parentShortName','parentShortSource','parentShortAt'])if(d[key]!==undefined)out[key]=d[key];
+  out.driveServices={};for(const role of ['write','read','public']){const item=d.driveServices?.[role]||{};out.driveServices[role]={appsScriptUrl:str(item.appsScriptUrl||item.url||item.endpoint),appsScriptToken:str(item.appsScriptToken||item.token)}}
+  return out;
+ }
+ const projectGmail=g=>({appsScriptUrl:str(g?.appsScriptUrl||g?.endpoint),appsScriptToken:str(g?.appsScriptToken||g?.token)});
+ function snapshotValue(id,value){return id==='drive'?projectDrive(value):projectGmail(value)}
+ idbGet=async function(store,id){
+  const db=DB,value=await rawGet(store,id);
+  if(store!=='settings'||!IDS.has(id)||!active()||!db)return value;
+  sameDb(db);const saved=backup(db)[id];return saved?keepCredentials(saved,value||{id}):value;
+ };
+ idbPut=function(store,value){
+  if(store!=='settings'||!IDS.has(value?.id)||!active())return rawPut(store,value);
+  const db=DB,silent=applying>0,key=db.name;
+  const operation=(queues.get(key)||Promise.resolve()).catch(()=>{}).then(async()=>{
+   sameDb(db);const previous=await idbGet(store,value.id);sameDb(db);
+   const next=keepCredentials(previous,value);await rawPut(store,next);sameDb(db);
+   try{localStorage.setItem(backupKey(db),JSON.stringify({...backup(db),[value.id]:next}))}catch{}
+   if(!silent&&JSON.stringify(snapshotValue(value.id,previous||{}))!==JSON.stringify(snapshotValue(value.id,next))){
+    const meta=await rawGet('settings',META)||{id:META};sameDb(db);
+    await rawPut('settings',{...meta,id:META,pending:[...new Set([...(meta.pending||[]),value.id==='drive'?'drive':'gmail'])]});
+   }
+   window.sf22InvalidateRouting?.();return next;
+  });
+  queues.set(key,operation);return operation;
+ };
+ window.idbGet=idbGet;window.idbPut=idbPut;
+ function userError(error){
+  const message=str(error?.message||error);
+  if(/invalid action|action not assigned|configStorage/i.test(message))return'Đã lưu trên thiết bị. Để lưu theo tài khoản và dùng rút gọn link, hãy cập nhật mã “Ghi & tài khoản” trong Thiết lập hệ thống, chạy setupSmartFormsDrive và triển khai Phiên bản mới một lần.';
+  if(/unauthorized/i.test(message))return'Token không khớp với URL Ghi dữ liệu. Cấu hình đã nhập vẫn được giữ trên thiết bị.';
+  return message||'Chưa lưu được cấu hình lên tài khoản. Cấu hình trên thiết bị vẫn được giữ.';
+ }
+ async function requestAt(cfg,payload,timeout=65000){
+  const requestId=driveRequestId(),started=Date.now(),controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeout);
+  try{
+   await directFetch(cfg.endpoint,{method:'POST',mode:'no-cors',cache:'no-store',headers:{'Content-Type':'text/plain;charset=utf-8'},signal:controller.signal,body:JSON.stringify({...payload,token:cfg.token,requestId})});
+   while(Date.now()-started<timeout){
+    await driveWait(650);
+    const response=await directJsonp(cfg.endpoint,{action:'requestStatus',token:cfg.token,requestId},20000);
+    if(!response?.ok)throw new Error(response?.error||'Không đọc được trạng thái lưu cấu hình.');
+    if(response.pending)continue;
+    if(response.result?.ok)return response.result.data||{};
+    const error=new Error(response.result?.message||'Yêu cầu chưa được chấp nhận.');error.code=response.result?.data?.code||'';throw error;
+   }
+   throw new Error('Chưa nhận được xác nhận từ Apps Script. Hãy thử lại; cấu hình trên thiết bị vẫn còn.');
+  }finally{clearTimeout(timer)}
+ }
+ async function writer(){const d=await idbGet('settings','drive')||{},c={endpoint:endpoint(d.appsScriptUrl||d.driveServices?.write?.appsScriptUrl),token:str(d.appsScriptToken||d.driveServices?.write?.appsScriptToken),folder:str(d.folderUrl)};if(!c.endpoint||!c.token)throw new Error('Đã lưu trên thiết bị. Hãy cấu hình URL/token Ghi dữ liệu để lưu theo tài khoản.');return c}
+ async function readCloud(cfg){const response=await directJsonp(cfg.endpoint,{action:'adminConfigGet',token:cfg.token},20000);if(!response?.ok)throw new Error(response?.error||'Không đọc được cấu hình tài khoản.');if(response.configStorage!==25)throw new Error('configStorage unavailable');return response.config||{version:0}}
+ async function setMeta(patch){const db=DB,meta=await rawGet('settings',META)||{id:META};sameDb(db);await rawPut('settings',{...meta,...patch,id:META});}
+ async function applyRemote(config,{force=false}={}){
+  if(!config||!Number(config.version))return false;
+  const db=DB,meta=await rawGet('settings',META)||{};sameDb(db);
+  if(!force&&(meta.pending||[]).length)return false;
+  applying++;
+  try{
+   if(config.drive&&Object.keys(config.drive).length){const old=await idbGet('settings','drive')||{};sameDb(db);await idbPut('settings',{...old,...config.drive,id:'drive'});}
+   if(config.gmail?.appsScriptUrl){const old=await idbGet('settings','gmail_bridge_v1')||{};sameDb(db);await idbPut('settings',{...old,...config.gmail,id:'gmail_bridge_v1'});}
+   sameDb(db);await setMeta({version:Number(config.version),cloudEndpoint:endpoint(config.drive?.appsScriptUrl),pending:[],savedAt:config.updatedAt||new Date().toISOString()});
+   restored.add(db.name);window.sf22InvalidateRouting?.();return true;
+  }finally{applying--}
+ }
+ async function restoreOnce(force=false){
+  if(!active()||!state.admin||!DB)return false;
+  const db=DB;if(!force&&restored.has(db.name))return false;restored.add(db.name);
+  try{const cfg=await writer(),config=await readCloud(cfg);sameDb(db);return await applyRemote(config,{force});}
+  catch(error){if(force)throw new Error(userError(error));return false}
+ }
+ async function saveCloudNow(section){
+  const db=DB,account=localAdminAccount();
+  if(!state.admin||!account.username||!account.hash)throw new Error('Hãy đăng nhập quản trị trước khi lưu cấu hình theo tài khoản.');
+  const cfg=await writer(),d=await idbGet('settings','drive')||{},g=await idbGet('settings','gmail_bridge_v1')||{};sameDb(db);
+  const status=await directJsonp(cfg.endpoint,{action:'adminStatus'},20000);sameDb(db);
+  if(!status?.ok)throw new Error(status?.error||'Không kiểm tra được tài khoản tại URL Ghi dữ liệu.');
+  if(status.configured&&(status.username!==account.username||status.salt!==account.salt))throw new Error('URL Ghi dữ liệu thuộc tài khoản khác hoặc thông tin đăng nhập đã thay đổi. Hãy đăng nhập đúng tài khoản của URL đó.');
+  // Đọc khả năng hỗ trợ trước khi thay đổi dữ liệu trên Apps Script cũ.
+  const remote=await readCloud(cfg);sameDb(db);
+  if(!status.configured)await requestAt(cfg,{action:'adminAccountSet',username:account.username,salt:account.salt,hash:account.hash,iterations:Number(account.it||180000),folder:cfg.folder,publicSiteUrl:d.publicSiteUrl||''});
+  const meta=await rawGet('settings',META)||{},sections=new Set([...(meta.pending||[]),section].filter(Boolean)),patch={};sameDb(db);
+  if(!remote.version){sections.add('drive');if(g.appsScriptUrl)sections.add('gmail');}
+  if(sections.has('drive'))patch.drive=projectDrive(d);
+  if(sections.has('gmail'))patch.gmail=projectGmail(g);
+  const expectedVersion=meta.cloudEndpoint===cfg.endpoint&&Number.isFinite(meta.version)?meta.version:Number(remote.version||0);
+  const receipt=await requestAt(cfg,{action:'adminConfigSave',username:account.username,expectedVersion,config:patch});sameDb(db);
+  const latest=await rawGet('settings',META)||{},stillPending=new Set(latest.pending||[]);
+  for(const name of sections){const current=await idbGet('settings',name==='drive'?'drive':'gmail_bridge_v1');sameDb(db);if(JSON.stringify(snapshotValue(name==='drive'?'drive':'gmail_bridge_v1',current||{}))===JSON.stringify(name==='drive'?projectDrive(d):projectGmail(g)))stillPending.delete(name);}
+  await setMeta({version:receipt.version,cloudEndpoint:cfg.endpoint,pending:[...stillPending],savedAt:receipt.updatedAt});
+  restored.add(db.name);return receipt;
+ }
+ function saveCloud(section){const result=cloudQueue.catch(()=>{}).then(()=>saveCloudNow(section));cloudQueue=result;return result;}
+ async function bindSavedWorkspace(){
+  const cfg=await writer();if(currentAdminEndpoint()===cfg.endpoint)return;
+  const account=localAdminAccount(),targetKey=ADMIN_ACCOUNT_SCOPE_PREFIX+workspaceStorageId(cfg.endpoint);
+  let target={};try{target=JSON.parse(localStorage.getItem(targetKey)||'{}')}catch{}
+  if(target.username&&(target.username!==account.username||target.salt!==account.salt))throw new Error('Thiết bị này đã có tài khoản khác tại URL mới. Cấu hình hiện tại vẫn được giữ.');
+  const snapshot=await snapshotCurrentWorkspace();await openWorkspaceDatabase(cfg.endpoint);
+  const db=DB;await new Promise((resolve,reject)=>{const tx=db.transaction(['settings','forms','apps','emails'],'readwrite');for(const store of ['settings','forms','apps','emails'])for(const item of snapshot[store]||[])tx.objectStore(store).put(cloneForStorage(item));tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error||new Error('Chưa chuyển được dữ liệu sang URL mới.'));});
+  activeAdminEndpoint=cfg.endpoint;state.publicEndpoint=cfg.endpoint;
+  try{const base=new URL(location.href);base.search='';base.hash='';history.replaceState(null,'',adminShareUrl(cfg.endpoint,base.toString()))}catch{}
+  saveLocalAdminAccount(account);rememberAdminBinding(account.username,cfg.endpoint);state.admin=true;saveRemoteAdminSession('local-admin-bound');
+  restored.add(db.name);window.sf22InvalidateRouting?.();configurePortalMode();writeUiSession({page:'admin',adminView:'system'});
+ }
+ async function openBound(account){
+  const url=boundEndpointForAdmin(account.username);if(!url||currentAdminEndpoint()===url)return;
+  await openWorkspaceDatabase(url);activeAdminEndpoint=url;state.publicEndpoint=url;
+  try{const base=new URL(location.href);base.search='';base.hash='';history.replaceState(null,'',adminShareUrl(url,base.toString()))}catch{}
+  saveLocalAdminAccount(account);window.sf22InvalidateRouting?.();configurePortalMode();
+ }
+ async function shorten(url,alias,force=false){
+  await saveCloud('drive');const db=DB,cfg=await writer(),receipt=await requestAt(cfg,{action:'adminShortenLink',url,alias,force});sameDb(db);
+  if(!/^https:\/\/(is\.gd|v\.gd)\/[A-Za-z0-9_]+$/.test(str(receipt.short)))throw new Error('Dịch vụ trả về link rút gọn không hợp lệ.');
+  await setMeta({version:receipt.version,cloudEndpoint:cfg.endpoint});return{...receipt,cloudSaved:true};
+ }
+ const originalLogout=window.logoutAdmin;
+ if(typeof originalLogout==='function')window.logoutAdmin=function(...args){if(DB)restored.delete(DB.name);return originalLogout.apply(this,args)};
+ const originalGate=renderAdminGate;
+ renderAdminGate=async function(...args){if(state.admin)await restoreOnce();return originalGate.apply(this,args)};window.renderAdminGate=renderAdminGate;
+ window.sf25Config={saveCloud,restoreOnce,applyRemote,bindSavedWorkspace,openBound,shorten,userError,endpoint};
+})();
+/* ===== Kết thúc SmartForms 25 ===== */
 
 </script></body></html>
