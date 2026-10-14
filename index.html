@@ -65,6 +65,16 @@ input,select,textarea{border-color:#ccdce6;border-radius:12px;background:#fcfeff
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 .submission-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:auto}.submission-actions .btn{margin-top:0!important;width:100%}.submission-actions .word-action{background:#fff;color:var(--svc);border:1px solid color-mix(in srgb,var(--svc) 28%,#dce7ec);box-shadow:none}.submission-actions .word-action:hover{background:color-mix(in srgb,var(--svc) 7%,#fff)}.submission-actions .btn:disabled{cursor:not-allowed;opacity:.58}.word-flow{display:grid;gap:15px}.word-step{padding:16px;border:1px solid #dbe7ed;border-radius:15px;background:#f8fbfc}.word-step-head{display:flex;gap:11px;align-items:flex-start;margin-bottom:12px}.word-step-number{width:30px;height:30px;flex:0 0 auto;display:grid;place-items:center;border-radius:10px;background:#e6f1f4;color:#0d647b;font-weight:900}.word-step h3{margin:2px 0 4px;color:#123f59;font-size:1rem}.word-step p{margin:0;color:#687b8a;font-size:.86rem;line-height:1.55}.word-file-status{margin-top:9px;padding:10px 12px;border-radius:10px;background:#fff;border:1px solid #dfe8ed;color:#5b6f7d;font-size:.84rem}.confirm-check{display:flex!important;flex-direction:row!important;align-items:flex-start;gap:10px;padding:13px;border:1px solid #cfe1e6;border-radius:12px;background:#f2f9f8}.confirm-check input{width:auto;min-height:0!important;margin-top:3px}.year-pair{display:grid;grid-template-columns:1fr auto 1fr;gap:9px;align-items:center}.year-pair>span{color:#687a88;font-weight:900}.year-pair input{text-align:center}.file-kind{display:inline-flex;align-items:center;gap:5px;padding:5px 8px;border-radius:999px;background:#eef7f5;color:#17705f;font-size:.76rem;font-weight:850}.word-admin-box{margin-bottom:15px;padding:15px;border:1px solid #cfe1e6;border-radius:14px;background:#f5faf9}.word-admin-box h3{margin:0 0 5px;color:#123f59}.word-admin-box p{margin:0 0 12px;color:#637684;font-size:.86rem}@media(max-width:620px){.submission-actions{grid-template-columns:1fr}.word-step{padding:14px}.year-pair{grid-template-columns:1fr 22px 1fr}}
 </style>
+<style id="sf28AccountGlow">
+.sf28-secrets{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.sf28-secret{min-width:0;display:flex;flex-direction:column;gap:13px;background:linear-gradient(155deg,#fff,#fffaf0);border:1px solid #ead9af}
+.sf28-secret-head{display:flex;align-items:center;gap:11px}.sf28-key-icon{display:grid;place-items:center;width:43px;height:43px;background:#fff1c7;border:1px solid #f3d986;border-radius:13px;font-size:22px;flex-shrink:0}.sf28-secret h3{margin:0 0 4px;font-size:16px}.sf28-secret-head p{margin:0;color:var(--muted);font-size:12px;line-height:1.5}
+.sf28-secret-value{display:block;min-height:58px;padding:14px;border-radius:12px;border:1px solid #ebdcae;background:#fff;overflow-wrap:anywhere;white-space:pre-wrap;font:600 14px/1.65 ui-monospace,monospace;color:#503911;user-select:text}.sf28-secret .field-hint{margin:0;line-height:1.65}.sf28-secret .actions{flex-wrap:wrap;gap:7px}.sf28-secret .btn{font-size:12px;padding:9px 11px}
+body :is(button,a[href],input,select,textarea,summary,.card,.section-box,.record,.student-card,.sf28-secret){transition:box-shadow .18s ease,outline-color .18s ease,background-color .18s ease,transform .18s ease}
+@media(hover:hover){body :is(button:not(:disabled),a[href],input:not(:disabled),select:not(:disabled),textarea:not(:disabled),summary,[role="button"],[role="tab"],.card,.section-box,.record,.student-card,.sf28-secret):hover{box-shadow:0 0 0 1px rgba(235,175,28,.65),0 0 16px rgba(255,195,35,.38),0 6px 20px rgba(207,148,0,.12)!important}}
+body :is(button,a[href],input,select,textarea,summary,[role="button"],[role="tab"]):focus-visible{outline:2px solid #a96c00;outline-offset:3px;box-shadow:0 0 15px rgba(255,195,35,.32)!important}
+@media(max-width:760px){.sf28-secrets{grid-template-columns:minmax(0,1fr)}}
+@media(prefers-reduced-motion:reduce){body :is(button,a[href],input,select,textarea,summary,.card,.section-box,.record,.student-card){transition:none!important}}
+</style>
 </head>
 <body>
 <header class="top"><div class="nav"><div class="brand"><div class="logo">ST</div><div>SmartForms<small>Hệ thống hồ sơ điện tử</small></div></div><div class="navright"><button class="navbtn active" data-page="home">Trang chủ</button><button class="navbtn portal-only" data-page="lookup">Tra cứu hồ sơ</button><button class="navbtn admin-only" data-page="admin">Quản trị</button></div></div></header>
@@ -1956,6 +1966,7 @@ function doPost(e){
 }
 
 function doGet(e){
+  if(e.parameter&&e.parameter.sf_link)return sfShortRedirect_(e.parameter.sf_link);
   const q=e.parameter||{},callback=/^[A-Za-z_$][\w$.]*$/.test(q.callback||'')?q.callback:'cb';
   try{
     if(q.action==='publicHealth')return jsonp_(callback,{ok:true,apiVersion:API_VERSION,publicUpload:true,verifiedUpload:true,fileBase64:true,fileName:true,fileMime:true,wordUpload:true,maxFileMb:10});
@@ -2175,7 +2186,8 @@ function adminLogin_(data,requestId){
   const account=adminAccountRecord_(),username=String(data.username||'').trim(),hash=String(data.hash||'').trim();
   if(!account||!secureEqual_(username,account.username)||!secureEqual_(hash,account.hash))return requestText_(requestId,false,'invalid credentials');
   const props=PropertiesService.getScriptProperties(),serviceToken=props.getProperty('SMARTFORMS_DRIVE_TOKEN')||'',folderId=props.getProperty('SMARTFORMS_ROOT_FOLDER_ID')||'',session=Utilities.getUuid().replace(/-/g,'')+Utilities.getUuid().replace(/-/g,'');cache.put('ADMIN_SESSION_'+session,'1',21600);
-  return requestText_(requestId,true,'signed in',{username:account.username,session:session,serviceToken:serviceToken,folderUrl:folderId?'https://drive.google.com/drive/folders/'+folderId:'',publicSiteUrl:String(account.publicSiteUrl||''),adminConfig:sf25ConfigRead_()});
+  if(data.rotateRecovery){props.setProperty(ADMIN_RECOVERY_PROPERTY,newRecoveryCode_());if(folderId)writeAdminAccountFile_(folder_(folderId),account)}
+  return requestText_(requestId,true,'signed in',{recoveryCode:recoveryCode_(),username:account.username,session:session,serviceToken:serviceToken,folderUrl:folderId?'https://drive.google.com/drive/folders/'+folderId:'',publicSiteUrl:String(account.publicSiteUrl||''),adminConfig:sf25ConfigRead_()});
 }
 function proofDigits_(value){return String(value||'').replace(/\D/g,'')}
 function sha256Hex_(value){return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,String(value||''),Utilities.Charset.UTF_8).map(function(byte){return('0'+((byte<0?byte+256:byte).toString(16))).slice(-2)}).join('')}
@@ -2308,39 +2320,53 @@ function sf25ConfigSave_(data,requestId){
   }finally{lock.releaseLock()}
 }
 function sf25ShortError_(code,message){const err=new Error(message);err.sfCode=code;return err}
+/* Liên kết phụ huynh 27: gọi dịch vụ từ máy chủ; có liên kết riêng dự phòng. */
+function sfShortError_(code,message){const e=new Error(message);e.sfCode=code;return e}
+function sfShortTarget_(value,site){
+  const target=String(value||'').trim(),base=String(site||'').trim().split(/[?#]/)[0];
+  if(target.length>3500||!/^https:\/\/[^\s?#@]+(?:\/[^\s?#]*)?\?/.test(target)||target.indexOf('#')>=0)throw sfShortError_('INVALID_URL','Hãy dùng link phụ huynh HTTPS do hệ thống tạo.');
+  if(base&&target.split('?')[0].replace(/\/$/,'')!==base.replace(/\/$/,''))throw sfShortError_('INVALID_URL','Link không thuộc website đã lưu. Hãy lưu lại địa chỉ website trước.');
+  const query={};target.split('?').slice(1).join('?').split('&').forEach(function(pair){
+    const parts=pair.split('='),key=decodeURIComponent(parts[0]),value=decodeURIComponent(parts.slice(1).join('=').replace(/\+/g,' '));
+    if(['view','sf','sf_service','sf_folder'].indexOf(key)<0||Object.prototype.hasOwnProperty.call(query,key))throw sfShortError_('INVALID_URL','Tham số link phụ huynh không hợp lệ.');query[key]=value;
+  });
+  if(query.view!=='parent'||!(query.sf&&/^[\w-]{20,}$/.test(query.sf)||query.sf_service&&/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(query.sf_service)))throw sfShortError_('INVALID_URL','Link chưa có dịch vụ phụ huynh hợp lệ.');
+  return target;
+}
+function sfShortCreate_(target,alias,force){
+  alias=String(alias||'').trim();if(alias&&!/^[A-Za-z0-9_]{5,30}$/.test(alias))throw sfShortError_('ALIAS','Tên link cần 5–30 chữ, số hoặc dấu gạch dưới.');
+  const props=PropertiesService.getScriptProperties(),own=String(ScriptApp.getService().getUrl()||'');
+  let payload={format:'json',url:target};if(alias)payload.shorturl=alias;else if(force)payload.shorturl='sf_'+Utilities.getUuid().replace(/-/g,'').slice(0,12);
+  for(const service of ['https://is.gd/create.php','https://v.gd/create.php']){
+    try{
+      const result=JSON.parse(UrlFetchApp.fetch(service,{method:'post',payload:payload,muteHttpExceptions:true,followRedirects:true}).getContentText());
+      if(/^https:\/\/(is\.gd|v\.gd)\/[A-Za-z0-9_]+$/.test(String(result.shorturl||'')))return{short:String(result.shorturl),service:service.indexOf('is.gd')>=0?'is.gd':'v.gd'};
+    }catch(error){}
+  }
+  if(!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(own))throw sfShortError_('NETWORK','Hãy triển khai Apps Script dưới dạng Ứng dụng web để tạo link riêng.');
+  const key=alias||'sf_'+Utilities.getUuid().replace(/-/g,'').slice(0,12),property='SF27_PARENT_LINK_'+key;
+  const old=props.getProperty(property);if(old&&old!==target)throw sfShortError_('ALIAS','Tên link riêng đã trỏ tới cổng khác. Hãy chọn tên khác.');
+  // Mỗi tên được giữ nguyên đích; tạo link mới không đổi đích của link đã gửi.
+  props.setProperty(property,target);return{short:own+'?sf_link='+encodeURIComponent(key),service:'private'};
+}
+function sfShortRedirect_(key){
+  const safe=v=>String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  let target='';try{if(!/^[A-Za-z0-9_]{5,30}$/.test(String(key||'')))throw new Error();target=sfShortTarget_(PropertiesService.getScriptProperties().getProperty('SF27_PARENT_LINK_'+key),'')}catch(error){}
+  const content=target?'<h1>Cổng phụ huynh</h1><p>Bấm nút bên dưới để mở biểu mẫu và tra cứu hồ sơ.</p><a class="button" target="_top" rel="noopener" href="'+safe(target)+'">Mở cổng phụ huynh →</a>':'<h1>Không tìm thấy liên kết</h1><p>Vui lòng liên hệ nhà trường để nhận lại link phụ huynh.</p>';
+  return HtmlService.createHtmlOutput('<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><base target="_top"><style>body{margin:0;background:#f3f7fc;font:17px/1.6 system-ui;color:#183853}main{max-width:520px;margin:10vh auto;padding:32px;background:white;border-radius:20px;box-shadow:0 10px 30px #142a4914}h1{font-size:26px}.button{display:inline-block;background:#2256d8;color:white;text-decoration:none;padding:13px 20px;border-radius:12px;font-weight:700}@media(max-width:600px){main{margin:30px 16px;padding:24px}}</style></head><body><main>'+content+'</main></body></html>').setTitle('Cổng phụ huynh');
+}
+
 function sf25Shorten_(data,requestId){
   try{
-    const longUrl=String(data.url||'').trim(),alias=String(data.alias||'').trim(),config=sf25ConfigRead_();
-    if(!/^https:\/\/[^\s?#@]+(?:\/[^\s?#]*)?\?/.test(longUrl)||longUrl.length>3500)throw sf25ShortError_('INVALID_URL','Link phụ huynh phải là địa chỉ HTTPS công khai.');
-    const query={};longUrl.split('?').slice(1).join('?').split('#')[0].split('&').forEach(function(pair){const parts=pair.split('=');query[decodeURIComponent(parts[0])]=decodeURIComponent(parts.slice(1).join('=').replace(/\+/g,' '))});
-    if(query.view!=='parent'||Object.keys(query).some(function(key){return['view','sf','sf_service','sf_folder'].indexOf(key)<0}))throw sf25ShortError_('INVALID_URL','Chỉ rút gọn liên kết phụ huynh do hệ thống tạo.');
-    const site=String(config.drive&&config.drive.publicSiteUrl||'').split(/[?#]/)[0];
-    if(site&&longUrl.split('?')[0].replace(/\/$/,'')!==site.replace(/\/$/,''))throw sf25ShortError_('INVALID_URL','Link không thuộc website đã lưu của tài khoản này.');
-    if(alias&&!/^[A-Za-z0-9_]{5,30}$/.test(alias))throw sf25ShortError_('ALIAS','Tên link cần 5–30 chữ, số hoặc dấu gạch dưới.');
-    if(config.drive&&config.drive.parentShortSource===longUrl&&String(config.drive.parentShortName||'')===alias&&config.drive.parentShortLink&&!data.force)return requestText_(requestId,true,'Link đã lưu',{short:config.drive.parentShortLink,version:config.version});
-    const cache=CacheService.getScriptCache(),cooldown=Number(cache.get('SF25_SHORT_COOLDOWN')||0);
-    if(cooldown>Date.now())throw sf25ShortError_('RATE','Dịch vụ giới hạn lượt tạo link. Hãy chờ khoảng một phút rồi thử lại.');
-    let short='',last='Chưa kết nối được dịch vụ rút gọn.';
-    const services=['https://is.gd/create.php','https://v.gd/create.php'];
-    for(let i=0;i<services.length;i++){
-      try{
-        const payload={format:'json',url:longUrl};if(alias)payload.shorturl=alias;else if(data.force)payload.shorturl='sf_'+Utilities.getUuid().replace(/-/g,'').slice(0,12);
-        const response=UrlFetchApp.fetch(services[i],{method:'post',payload:payload,muteHttpExceptions:true,followRedirects:true});
-        let result;try{result=JSON.parse(response.getContentText())}catch(err){throw new Error('Dịch vụ rút gọn chưa trả về dữ liệu hợp lệ.')}
-        if(/^https:\/\/(is\.gd|v\.gd)\/[A-Za-z0-9_]+$/.test(String(result.shorturl||''))){short=String(result.shorturl);break}
-        const code=Number(result.errorcode||0);
-        if(code===1)throw sf25ShortError_('INVALID_URL','Dịch vụ không chấp nhận link phụ huynh. Hãy kiểm tra website đã được công khai.');
-        if(code===2)throw sf25ShortError_('ALIAS','Tên link đã được dùng hoặc không được dịch vụ chấp nhận. Hãy chọn tên khác.');
-        if(code===3){cache.put('SF25_SHORT_COOLDOWN',String(Date.now()+60000),60);throw sf25ShortError_('RATE','Dịch vụ giới hạn lượt tạo link. Hãy chờ khoảng một phút rồi thử lại.')}
-        throw new Error('Dịch vụ rút gọn tạm thời chưa sẵn sàng.');
-      }catch(error){if(error.sfCode)throw error;last=String(error.message||error)}
-    }
-    if(!short)throw sf25ShortError_('NETWORK',last);
-    // Chỉ cập nhật link sau khi dịch vụ đã trả về kết quả hợp lệ; giữ mọi cấu hình khác.
-    const lock=LockService.getScriptLock();if(!lock.tryLock(10000))throw new Error('Đã tạo link nhưng chưa lưu được. Hãy thử lại.');
-    let next;
-    try{const latest=sf25ConfigRead_();next=sf25ConfigMerge_(latest,{drive:{parentShortLink:short,parentShortName:alias,parentShortSource:longUrl,parentShortAt:new Date().toISOString()}});next.version=Number(latest.version||0)+1;next.updatedAt=new Date().toISOString();sf25StoreConfig_(next)}finally{lock.releaseLock()}
-    return requestText_(requestId,true,'Đã tạo và lưu link phụ huynh',{short:short,service:short.split('/')[2],version:next.version});
+    const current=sf25ConfigRead_(),drive=current.drive||{},url=sfShortTarget_(data.url,drive.publicSiteUrl||data.publicSiteUrl),alias=String(data.alias||'').trim();
+    if(!data.force&&drive.parentShortSource===url&&String(drive.parentShortName||'')===alias&&drive.parentShortLink)return requestText_(requestId,true,'Link đã lưu',{short:drive.parentShortLink,version:current.version,previousVersion:current.version});
+    const result=sfShortCreate_(url,alias,!!data.force),lock=LockService.getScriptLock();lock.waitLock(10000);let next,previousVersion;
+    try{
+      const latest=sf25ConfigRead_();previousVersion=Number(latest.version||0);
+      next=sf25ConfigMerge_(latest,{drive:{parentShortLink:result.short,parentShortName:alias,parentShortSource:url,parentShortAt:new Date().toISOString()}});
+      next.version=previousVersion+1;next.updatedAt=new Date().toISOString();sf25StoreConfig_(next);
+    }finally{lock.releaseLock()}
+    return requestText_(requestId,true,'Đã tạo link phụ huynh',Object.assign(result,{version:next.version,previousVersion:previousVersion,updatedAt:next.updatedAt}));
   }catch(error){return requestText_(requestId,false,String(error.message||error),{code:error.sfCode||'NETWORK'})}
 }
 
@@ -2653,7 +2679,7 @@ function sf25Shorten_(data,requestId){
      saveRemoteAdminSession(result.session||'1');writeUiSession({page:'admin',adminView:'dashboard'});configurePortalMode();
      let syncError='';
      try{await pullDriveHierarchy(progress=>update(progress.message||'Đang lấy dữ liệu mới nhất từ Drive…'))}catch(error){syncError=driveHierarchyError(error)}
-     state.admin=true;if(box)box.innerHTML='';await renderAdminGate();showAdminView('dashboard');
+     state.admin=true;window.sf26Accounts?.rememberSecrets(password,result.recoveryCode||'',account);if(box)box.innerHTML='';await renderAdminGate();showAdminView('dashboard');
      if(syncError){const dashboard=$('#av-dashboard');if(dashboard)dashboard.insertAdjacentHTML('afterbegin',`<div class="notice warn">Đã đăng nhập thành công, nhưng chưa tải được dữ liệu mới: ${esc(syncError)}. Hãy vào Kết nối Drive để lấy dữ liệu lại.</div>`)}
    }catch(error){
      if(box)box.innerHTML='';
@@ -2820,7 +2846,7 @@ function sf25Shorten_(data,requestId){
  window.sfAdminWorkspace={
   localAdminAccount,currentAdminEndpoint,snapshotCurrentWorkspace,openWorkspaceDatabase,
   saveLocalAdminAccount,rememberAdminBinding,boundEndpointForAdmin,saveRemoteAdminSession,
-  adminShareUrl,configurePortalMode,
+  adminShareUrl,configurePortalMode,loginRemoteAdminFromBase,sharedPublicPostAt,syncAdminAccountRemote,moveAdminBinding,
   accountKeyForEndpoint(endpoint){return ADMIN_ACCOUNT_SCOPE_PREFIX+workspaceStorageId(endpoint)},
   setActiveEndpoint(endpoint){activeAdminEndpoint=endpoint;state.publicEndpoint=endpoint}
  };
@@ -5077,14 +5103,14 @@ window.sf17Shorten=shortenLink;
   // Tương thích với Writer cũ. Việc gọi qua Writer mới không phụ thuộc CORS của dịch vụ.
   let last='';
   for(const service of ['https://is.gd/create.php','https://v.gd/create.php']){
-   try{return{short:await requestShort(service,target.toString(),alias),service:service.includes('is.gd')?'is.gd':'v.gd',cloudSaved:false}}
+   try{return{short:await requestShort(service,target.toString(),alias|| (force?'sf_'+Array.from(crypto.getRandomValues(new Uint8Array(6)),v=>v.toString(16).padStart(2,'0')).join(''):'')),service:service.includes('is.gd')?'is.gd':'v.gd',cloudSaved:false}}
    catch(error){if(['TAKEN','ALIAS','RATE'].includes(error.code))throw error;last=String(error?.message||error)}
   }
   throw new Error(bridgeError?window.sf25Config.userError(bridgeError)+' Nếu đã cập nhật, hãy kiểm tra quyền kết nối của Apps Script.':last||'Chưa tạo được link rút gọn. Link phụ huynh gốc vẫn dùng được.');
  }
  async function drawShortPanel(data){
   const body=q('#sf18ShortBody');if(!body)return;const parent=safeText(data.parent||''),saved=safeText(data.saved||''),stale=!!data.stale;
-  if(saved&&!stale&&!data.editing){body.innerHTML=`<div class="sf18-short-link">${html(saved)}</div><div class="sf18-link-row"><button class="btn primary" type="button" id="sf18ShortCopy">Sao chép link</button><a class="btn secondary btn-link" href="${html(saved)}" target="_blank" rel="noopener">Mở thử ↗</a><button class="btn ghost" type="button" id="sf18ShortNew">Tạo link khác</button></div><div class="sf18-short-msg" id="sf18ShortMsg">Link này đang được lưu cố định trong hệ thống.</div>`;
+  if(saved&&!stale&&!data.editing){body.innerHTML=`<div class="sf18-short-link">${html(saved)}</div><div class="sf18-link-row"><button class="btn primary" type="button" id="sf18ShortCopy">Sao chép link</button><a class="btn secondary btn-link" href="${html(saved)}" target="_blank" rel="noopener">Mở thử ↗</a><button class="btn ghost" type="button" id="sf18ShortNew">Tạo link khác</button></div><div class="sf18-short-msg" id="sf18ShortMsg">Link này đang được lưu cố định trong hệ thống.${saved.includes('?sf_link=')?' Mở link rồi chọn “Mở cổng phụ huynh”.':''}</div>`;
    q('#sf18ShortCopy').onclick=async()=>{const b=q('#sf18ShortCopy');b.textContent=await copyText(saved)?'Đã sao chép':'Không sao chép được';setTimeout(()=>{if(b.isConnected)b.textContent='Sao chép link'},1600)};
    q('#sf18ShortNew').onclick=async()=>{if(!confirm('Tạo một link rút gọn khác? Link cũ vẫn tiếp tục hoạt động.'))return;await drawShortPanel({...data,editing:true})};return;
   }
@@ -5768,7 +5794,7 @@ window.sf17Shorten=shortenLink;
   const roleHeader='/* ST SmartForms Drive module · '+role+' · mỗi dự án chỉ nhận nhóm tác vụ được cấp */\nconst SF_SERVICE_ROLE='+JSON.stringify(role)+';\nconst SF_ROLE_ACTIONS='+JSON.stringify(ROLE_ACTIONS)+';\nfunction sfRoleAllows_(method,action){if(SF_SERVICE_ROLE===\'all\')return true;const set=SF_ROLE_ACTIONS[SF_SERVICE_ROLE]||SF_ROLE_ACTIONS.write;return (set[method]||[]).indexOf(String(action||\'\'))>=0;}\n';
   if(!source.includes('const _sfProbeId=')){
    source=source.replace('function doPost(e){','function doPost(e){\n  let _sfProbe;try{_sfProbe=JSON.parse((e.postData&&e.postData.contents)||\'{}\')}catch(_sfErr){return ContentService.createTextOutput(\'invalid json\')}const _sfProbeId=requestId_(_sfProbe.requestId);if(!sfRoleAllows_(\'post\',_sfProbe.action))return requestText_(_sfProbeId,false,\'action not assigned to \'+SF_SERVICE_ROLE);');
-   source=source.replace('function doGet(e){','function doGet(e){\n  const _sfQ=e.parameter||{},_sfCb=/^[A-Za-z_$][\\w$.]*$/.test(_sfQ.callback||\'\')?_sfQ.callback:\'cb\';if(!sfRoleAllows_(\'get\',_sfQ.action))return jsonp_(_sfCb,{ok:false,error:\'action not assigned to \'+SF_SERVICE_ROLE});');
+   source=source.replace('function doGet(e){','function doGet(e){\n  const _sfQ=e.parameter||{},_sfCb=/^[A-Za-z_$][\\w$.]*$/.test(_sfQ.callback||\'\')?_sfQ.callback:\'cb\';if(_sfQ.sf_link&&SF_SERVICE_ROLE===\'write\')return sfShortRedirect_(_sfQ.sf_link);if(!sfRoleAllows_(\'get\',_sfQ.action))return jsonp_(_sfCb,{ok:false,error:\'action not assigned to \'+SF_SERVICE_ROLE});');
   }
   return roleHeader+source;
  }
@@ -6435,6 +6461,11 @@ window.sf17Shorten=shortenLink;
 /* ===== Kết thúc SmartForms 23.0 ===== */
 
 /* ===== SmartForms 25 · giữ cấu hình theo tài khoản và rút gọn link qua Writer ===== */
+function sf27ValidShort(value,endpoint){
+ const text=String(value||'').trim();if(/^https:\/\/(is\.gd|v\.gd)\/[A-Za-z0-9_]+$/.test(text))return true;
+ try{const u=new URL(text),base=new URL(endpoint);return u.protocol==='https:'&&u.origin==='https://script.google.com'&&u.origin+u.pathname===base.origin+base.pathname&&!u.hash&&[...u.searchParams.keys()].length===1&&/^[A-Za-z0-9_]{5,30}$/.test(u.searchParams.get('sf_link')||'')}catch{return false}
+}
+
 (function installSmartForms25(){
  'use strict';
  const adminWorkspace=window.sfAdminWorkspace;
@@ -6506,7 +6537,7 @@ window.sf17Shorten=shortenLink;
    throw new Error('Chưa nhận được xác nhận từ Apps Script. Hãy thử lại; cấu hình trên thiết bị vẫn còn.');
   }finally{clearTimeout(timer)}
  }
- async function writer(){const d=await idbGet('settings','drive')||{},c={endpoint:endpoint(d.appsScriptUrl||d.driveServices?.write?.appsScriptUrl),token:str(d.appsScriptToken||d.driveServices?.write?.appsScriptToken),folder:str(d.folderUrl)};if(!c.endpoint||!c.token)throw new Error('Đã lưu trên thiết bị. Hãy cấu hình URL/token Ghi dữ liệu để lưu theo tài khoản.');return c}
+ async function writer(){const d=await idbGet('settings','drive')||{},c={endpoint:endpoint(d.driveServices?.write?.appsScriptUrl||d.appsScriptUrl),token:str(d.driveServices?.write?.appsScriptToken||d.appsScriptToken),folder:str(d.folderUrl)};if(!c.endpoint||!c.token)throw new Error('Đã lưu trên thiết bị. Hãy cấu hình URL/token Ghi dữ liệu để lưu theo tài khoản.');return c}
  async function readCloud(cfg){const response=await directJsonp(cfg.endpoint,{action:'adminConfigGet',token:cfg.token},20000);if(!response?.ok)throw new Error(response?.error||'Không đọc được cấu hình tài khoản.');if(response.configStorage!==25)throw new Error('configStorage unavailable');return response.config||{version:0}}
  async function setMeta(patch){const db=DB,meta=await rawGet('settings',META)||{id:META};sameDb(db);await rawPut('settings',{...meta,...patch,id:META});}
  async function applyRemote(config,{force=false}={}){
@@ -6569,12 +6600,12 @@ window.sf17Shorten=shortenLink;
   try{const base=new URL(location.href);base.search='';base.hash='';history.replaceState(null,'',adminWorkspace.adminShareUrl(url,base.toString()))}catch{}
   adminWorkspace.saveLocalAdminAccount(account);window.sf22InvalidateRouting?.();adminWorkspace.configurePortalMode();
  }
- async function shorten(url,alias,force=false){
-  if(window.sf26Accounts?.linked())return window.sf26Accounts.shorten(url,alias,force);
-  await saveCloud('drive');const db=DB,cfg=await writer(),receipt=await requestAt(cfg,{action:'adminShortenLink',url,alias,force});sameDb(db);
-  if(!/^https:\/\/(is\.gd|v\.gd)\/[A-Za-z0-9_]+$/.test(str(receipt.short)))throw new Error('Dịch vụ trả về link rút gọn không hợp lệ.');
-  await setMeta({version:receipt.version,cloudEndpoint:cfg.endpoint});return{...receipt,cloudSaved:true};
+ async function shortenNow(url,alias,force=false){
+  const db=DB,cfg=await writer(),d=await idbGet('settings','drive')||{},receipt=await requestAt(cfg,{action:'adminShortenLink',url,alias,force,publicSiteUrl:d.publicSiteUrl||''});sameDb(db);
+  if(!sf27ValidShort(receipt.short,cfg.endpoint))throw new Error('Dịch vụ trả về link rút gọn không hợp lệ.');
+  const meta=await rawGet('settings',META)||{};sameDb(db);if(meta.cloudEndpoint===cfg.endpoint&&Number(meta.version)===Number(receipt.previousVersion))await setMeta({version:receipt.version,cloudEndpoint:cfg.endpoint});return{...receipt,cloudSaved:true};
  }
+ function shorten(url,alias,force=false){if(window.sf26Accounts?.linked())return window.sf26Accounts.shorten(url,alias,force);const result=cloudQueue.catch(()=>{}).then(()=>shortenNow(url,alias,force));cloudQueue=result;return result}
  const originalLogout=window.logoutAdmin;
  if(typeof originalLogout==='function')window.logoutAdmin=function(...args){if(DB)restored.delete(DB.name);return originalLogout.apply(this,args)};
  const originalGate=renderAdminGate;
@@ -6584,7 +6615,7 @@ window.sf17Shorten=shortenLink;
 /* ===== Kết thúc SmartForms 25 ===== */
 
 
-window.SF_ADMIN_ACCOUNTS_CODE="/**\n * SmartForms Accounts 26.0 — một tài khoản quản trị cho mỗi dự án / URL.\n * 1. Tạo dự án Apps Script RIÊNG, dán toàn bộ tệp này.\n * 2. Chạy setupSmartFormsAdmin, cấp quyền và giữ mã đăng ký trong Nhật ký.\n * 3. Triển khai Web App: Thực thi bằng Tôi / Người có quyền truy cập: Bất kỳ ai.\n * 4. Dán URL /exec và mã đăng ký vào mục Tài khoản admin trên website.\n * Tài khoản + cấu hình được lưu trong tệp riêng trên Drive của chủ dự án.\n * PDF/Word và hồ sơ vẫn nằm ở kho Drive đã cấu hình; không lưu mật khẩu gốc.\n * Cập nhật mã: triển khai phiên bản mới trên cùng lượt triển khai để giữ URL.\n * https://developers.google.com/apps-script/guides/web\n */\nconst SF_ADMIN_VERSION=26;\nconst SF_ADMIN_FILE='SMARTFORMS_ADMIN_STORE_ID';\nconst SF_ADMIN_SESSION_MS=6*60*60*1000;\n\nfunction setupSmartFormsAdmin(){\n  const lock=LockService.getScriptLock();lock.waitLock(10000);\n  try{\n    const props=PropertiesService.getScriptProperties();\n    if(!props.getProperty(SF_ADMIN_FILE)){\n      const initial={format:26,account:null,epoch:0,config:{version:0,drive:{},gmail:{}}};\n      const file=DriveApp.createFile('SmartForms - Tai khoan admin va cau hinh.json',JSON.stringify(initial),MimeType.PLAIN_TEXT);\n      props.setProperty(SF_ADMIN_FILE,file.getId());\n    }\n    const store=sfAdminRead_();\n    if(store.account){console.log('Đã có tài khoản '+store.account.username+'. Cấu hình và tài khoản được giữ nguyên.');return}\n    let code=props.getProperty('SMARTFORMS_ADMIN_REGISTER_CODE');\n    if(!code){code=sfAdminRandom_();props.setProperty('SMARTFORMS_ADMIN_REGISTER_CODE',code)}\n    console.log('SMARTFORMS_ADMIN_REGISTER_CODE = '+code);\n    console.log('Mã này chỉ dùng để đăng ký lần đầu. Sau đó đăng nhập bằng tên và mật khẩu.');\n  }finally{lock.releaseLock()}\n}\nfunction sfAdminRandom_(){return Utilities.getUuid().replace(/-/g,'')+Utilities.getUuid().replace(/-/g,'')}\nfunction sfAdminDigest_(value){return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,String(value),Utilities.Charset.UTF_8).map(function(b){return('0'+((b+256)%256).toString(16)).slice(-2)}).join('')}\nfunction sfAdminEqual_(a,b){a=String(a||'');b=String(b||'');let diff=a.length^b.length;for(let i=0;i<Math.max(a.length,b.length);i++)diff|=(a.charCodeAt(i)||0)^(b.charCodeAt(i)||0);return diff===0}\nfunction sfAdminRead_(){\n  const id=PropertiesService.getScriptProperties().getProperty(SF_ADMIN_FILE);\n  if(!id)throw new Error('Chưa cài đặt. Hãy chạy setupSmartFormsAdmin trong Apps Script.');\n  const value=JSON.parse(DriveApp.getFileById(id).getBlob().getDataAsString('UTF-8'));\n  if(value.format!==26||!value.config)throw new Error('Tệp tài khoản không hợp lệ. Hệ thống đã dừng để giữ dữ liệu.');\n  return value;\n}\nfunction sfAdminWrite_(store){\n  const text=JSON.stringify(store);\n  if(Utilities.newBlob(text).getBytes().length>60000)throw new Error('Cấu hình vượt giới hạn 60 KB. Không lưu PDF/Word vào cấu hình tài khoản.');\n  DriveApp.getFileById(PropertiesService.getScriptProperties().getProperty(SF_ADMIN_FILE)).setContent(text);\n}\nfunction sfAdminPublic_(store){const a=store.account;return{ok:true,service:'SmartForms Accounts',version:26,configured:!!a,username:a?a.username:'',salt:a?a.salt:'',iterations:a?a.iterations:180000}}\nfunction sfAdminCredentials_(data){\n  const a={username:String(data.username||'').trim(),salt:String(data.salt||''),hash:String(data.hash||''),iterations:Number(data.iterations||180000)};\n  if(a.username.length<3||a.username.length>80||/[\\u0000-\\u001f]/.test(a.username))throw new Error('Tên đăng nhập cần 3–80 ký tự.');\n  if(!/^[A-Za-z0-9+/]{32}={0,2}$/.test(a.salt)||!/^[A-Za-z0-9+/]{43}=$/.test(a.hash)||!Number.isInteger(a.iterations)||a.iterations<180000||a.iterations>600000)throw new Error('Dữ liệu xác minh mật khẩu không hợp lệ. Hãy tải lại website.');\n  return a;\n}\nfunction sfAdminRate_(failed){\n  const props=PropertiesService.getScriptProperties(),now=Date.now();let item=JSON.parse(props.getProperty('SF26_AUTH_FAILURES')||'{}');\n  if(!item.until||now>=item.until)item={count:0,until:now+10*60*1000};\n  if(item.count>=12)throw new Error('Đã có nhiều lần xác minh sai. Vui lòng chờ 10 phút.');\n  if(failed){item.count++;props.setProperty('SF26_AUTH_FAILURES',JSON.stringify(item))}\n}\nfunction sfAdminSession_(store){\n  const props=PropertiesService.getScriptProperties(),all=props.getProperties(),now=Date.now();let valid=[];\n  Object.keys(all).filter(k=>k.indexOf('SF26_SESSION_')===0).forEach(function(k){let s;try{s=JSON.parse(all[k])}catch(e){}if(!s||s.expiresAt<=now||s.epoch!==store.epoch)props.deleteProperty(k);else valid.push({key:k,expiresAt:s.expiresAt})});\n  valid.sort((a,b)=>a.expiresAt-b.expiresAt);while(valid.length>=8)props.deleteProperty(valid.shift().key);\n  const token=sfAdminRandom_(),expiresAt=now+SF_ADMIN_SESSION_MS;\n  props.setProperty('SF26_SESSION_'+sfAdminDigest_(token),JSON.stringify({epoch:store.epoch,expiresAt:expiresAt}));\n  return{session:token,expiresAt:expiresAt,username:store.account.username,config:store.config};\n}\nfunction sfAdminAuthorize_(store,token){\n  if(!store.account||!/^[a-f0-9]{64}$/.test(String(token||'')))throw new Error('SESSION_EXPIRED: Hãy đăng nhập lại tài khoản admin.');\n  const raw=PropertiesService.getScriptProperties().getProperty('SF26_SESSION_'+sfAdminDigest_(token));let session;\n  try{session=JSON.parse(raw||'null')}catch(e){}\n  if(!session||session.epoch!==store.epoch||session.expiresAt<=Date.now())throw new Error('SESSION_EXPIRED: Hãy đăng nhập lại tài khoản admin.');\n}\nfunction sfAdminConfig_(current,patch){\n  const next=JSON.parse(JSON.stringify(current||{version:0,drive:{},gmail:{}}));\n  function fields(old,values,keys){const out=Object.assign({},old||{});keys.forEach(function(k){if(!Object.prototype.hasOwnProperty.call(values||{},k))return;const v=values[k];if(typeof v==='boolean'){out[k]=v;return}if(typeof v!=='string')throw new Error('Cấu hình không hợp lệ.');if(v.trim()||k==='parentShortName')out[k]=v.trim()});return out}\n  if(patch.drive){\n    next.drive=fields(next.drive,patch.drive,['appsScriptUrl','appsScriptToken','folderUrl','publicSiteUrl','autoForms','autoApps','parentShortLink','parentShortName','parentShortSource','parentShortAt']);\n    const services=next.drive.driveServices||{};\n    ['write','read','public'].forEach(function(role){services[role]=fields(services[role],patch.drive.driveServices&&patch.drive.driveServices[role],['appsScriptUrl','appsScriptToken'])});next.drive.driveServices=services;\n    if(patch.drive.formFolders){const folders={};Object.keys(patch.drive.formFolders).forEach(function(k){if(['__proto__','constructor','prototype'].indexOf(k)>=0)throw new Error('Mã biểu mẫu không hợp lệ.');folders[k]=String(patch.drive.formFolders[k]||'').trim()});next.drive.formFolders=folders}\n  }\n  if(patch.gmail)next.gmail=fields(next.gmail,patch.gmail,['appsScriptUrl','appsScriptToken']);\n  [next.drive,next.gmail].concat(Object.values(next.drive.driveServices||{})).forEach(function(s){if(s.appsScriptUrl&&!/^https:\\/\\/script\\.google\\.com\\/macros\\/s\\/[\\w-]+\\/exec$/.test(s.appsScriptUrl))throw new Error('URL Apps Script trong cấu hình chưa đúng.');if(String(s.appsScriptToken||'').length>500)throw new Error('Token vượt giới hạn.')});\n  next.version=Number(current.version||0)+1;next.updatedAt=new Date().toISOString();return next;\n}\nfunction sfAdminShorten_(store,data){\n  const url=String(data.url||''),alias=String(data.alias||''),drive=store.config.drive||{},site=String(drive.publicSiteUrl||'').split(/[?#]/)[0];\n  if(!/^https:\\/\\/[^\\s?#@]+(?:\\/[^\\s?#]*)?\\?/.test(url)||url.length>3500||!site||url.split('?')[0].replace(/\\/$/,'')!==site.replace(/\\/$/,''))throw new Error('Link phải thuộc website HTTPS đã lưu trong cấu hình.');\n  const query={};url.split('?')[1].split('#')[0].split('&').forEach(function(pair){const parts=pair.split('=');query[decodeURIComponent(parts[0])]=decodeURIComponent(parts.slice(1).join('='))});\n  if(query.view!=='parent'||Object.keys(query).some(k=>['view','sf','sf_service','sf_folder'].indexOf(k)<0))throw new Error('Chỉ hỗ trợ rút gọn liên kết phụ huynh do hệ thống tạo.');\n  if(alias&&!/^[A-Za-z0-9_]{5,30}$/.test(alias))throw new Error('Tên link cần 5–30 chữ, số hoặc dấu gạch dưới.');\n  if(!data.force&&drive.parentShortSource===url&&drive.parentShortName===alias&&drive.parentShortLink)return{short:drive.parentShortLink,version:store.config.version};\n  const payload={format:'json',url:url};if(alias)payload.shorturl=alias;else if(data.force)payload.shorturl='sf_'+Utilities.getUuid().replace(/-/g,'').slice(0,12);\n  const response=JSON.parse(UrlFetchApp.fetch('https://is.gd/create.php',{method:'post',payload:payload,muteHttpExceptions:true}).getContentText());\n  if(!/^https:\\/\\/is\\.gd\\/[A-Za-z0-9_]+$/.test(String(response.shorturl||'')))throw new Error(Number(response.errorcode)===2?'Tên link đã được dùng. Hãy chọn tên khác.':'Dịch vụ rút gọn chưa sẵn sàng. Hãy thử lại sau.');\n  store.config=sfAdminConfig_(store.config,{drive:{parentShortLink:response.shorturl,parentShortName:alias,parentShortSource:url,parentShortAt:new Date().toISOString()}});sfAdminWrite_(store);\n  return{short:response.shorturl,version:store.config.version,updatedAt:store.config.updatedAt};\n}\nfunction sfAdminDispatch_(data){\n  const store=sfAdminRead_(),props=PropertiesService.getScriptProperties(),action=String(data.action||'');\n  if(action==='accountRegister'){\n    if(store.account)throw new Error('URL này đã có tài khoản admin. Hãy chọn Đăng nhập.');\n    sfAdminRate_(false);const code=props.getProperty('SMARTFORMS_ADMIN_REGISTER_CODE');\n    if(!code||!sfAdminEqual_(code,data.registerCode)){sfAdminRate_(true);throw new Error('Mã đăng ký không đúng. Hãy lấy mã trong Nhật ký setupSmartFormsAdmin.')}\n    const account=sfAdminCredentials_(data),recoveryCode=sfAdminRandom_();account.recoveryHash=sfAdminDigest_(recoveryCode);store.account=account;store.epoch=1;\n    store.config=sfAdminConfig_(store.config,data.config||{});sfAdminWrite_(store);props.deleteProperty('SMARTFORMS_ADMIN_REGISTER_CODE');props.deleteProperty('SF26_AUTH_FAILURES');\n    return Object.assign(sfAdminSession_(store),{recoveryCode:recoveryCode});\n  }\n  if(action==='accountLogin'){\n    sfAdminRate_(false);\n    if(!store.account||!sfAdminEqual_(store.account.username,String(data.username||'').trim())||!sfAdminEqual_(store.account.hash,data.hash)){sfAdminRate_(true);throw new Error('Tên đăng nhập hoặc mật khẩu không đúng.')}\n    props.deleteProperty('SF26_AUTH_FAILURES');return sfAdminSession_(store);\n  }\n  if(action==='accountRecover'){\n    sfAdminRate_(false);\n    if(!store.account||!sfAdminEqual_(store.account.username,String(data.username||'').trim())||!sfAdminEqual_(store.account.recoveryHash,sfAdminDigest_(String(data.recoveryCode||'')))){sfAdminRate_(true);throw new Error('Tên đăng nhập hoặc mã khôi phục không đúng.')}\n    const account=sfAdminCredentials_(data),recoveryCode=sfAdminRandom_();account.recoveryHash=sfAdminDigest_(recoveryCode);store.account=account;store.epoch++;sfAdminWrite_(store);props.deleteProperty('SF26_AUTH_FAILURES');\n    return Object.assign(sfAdminSession_(store),{recoveryCode:recoveryCode});\n  }\n  sfAdminAuthorize_(store,data.session);\n  if(action==='accountConfigGet')return{config:store.config,username:store.account.username};\n  if(action==='accountConfigSave'){\n    if(Number(data.expectedVersion)!==Number(store.config.version))throw new Error('CONFIG_CONFLICT: Cấu hình đã đổi trên máy khác. Hãy lấy cấu hình tài khoản trước khi sửa lại.');\n    store.config=sfAdminConfig_(store.config,data.config||{});sfAdminWrite_(store);return{version:store.config.version,updatedAt:store.config.updatedAt};\n  }\n  if(action==='accountChange'){\n    sfAdminRate_(false);if(!sfAdminEqual_(store.account.hash,data.currentHash)){sfAdminRate_(true);throw new Error('Mật khẩu hiện tại không đúng.')}\n    const next=sfAdminCredentials_(data);next.recoveryHash=store.account.recoveryHash;store.account=next;store.epoch++;sfAdminWrite_(store);props.deleteProperty('SF26_AUTH_FAILURES');return sfAdminSession_(store);\n  }\n  if(action==='accountLogout'){props.deleteProperty('SF26_SESSION_'+sfAdminDigest_(data.session));return{signedOut:true}}\n  if(action==='accountShorten')return sfAdminShorten_(store,data);\n  throw new Error('Chức năng không được hỗ trợ trong dự án Tài khoản admin.');\n}\n// Kết quả riêng chỉ đọc được bằng hai mã ngẫu nhiên của yêu cầu POST, hết hạn sau 180 giây.\nfunction sfAdminReceiptKey_(id,key){if(!/^[a-f0-9]{64}$/.test(String(id||''))||!/^[a-f0-9]{64}$/.test(String(key||'')))throw new Error('Mã yêu cầu không hợp lệ.');return'SF26_RESULT_'+sfAdminDigest_(id+'|'+key)}\nfunction doPost(e){\n  let data,key;try{if(String(e.postData.contents||'').length>65000)throw new Error('Yêu cầu quá lớn.');data=JSON.parse(e.postData.contents);key=sfAdminReceiptKey_(data.requestId,data.responseKey)}catch(error){return ContentService.createTextOutput('invalid request')}\n  const cache=CacheService.getScriptCache(),lock=LockService.getScriptLock();let locked=false;\n  try{\n    lock.waitLock(15000);locked=true;if(cache.get(key))return ContentService.createTextOutput('accepted');\n    const result=sfAdminDispatch_(data);cache.put(key,JSON.stringify({ok:true,data:result}),180);\n  }catch(error){cache.put(key,JSON.stringify({ok:false,error:String(error.message||error)}),180)}finally{if(locked)lock.releaseLock()}\n  return ContentService.createTextOutput('accepted');\n}\nfunction doGet(e){\n  const q=e.parameter||{},callback=String(q.callback||'');let result;\n  try{\n    if(q.action==='accountInfo')result=sfAdminPublic_(sfAdminRead_());\n    else if(q.action==='accountResult'){const key=sfAdminReceiptKey_(q.requestId,q.responseKey),raw=CacheService.getScriptCache().get(key);result=raw?JSON.parse(raw):{ok:true,pending:true}}\n    else result={ok:false,error:'Đây là dịch vụ Tài khoản admin. Hãy mở website để đăng nhập.'};\n  }catch(error){result={ok:false,error:String(error.message||error)}}\n  const text=JSON.stringify(result);\n  if(callback&&/^[A-Za-z_$][A-Za-z0-9_$]{0,100}$/.test(callback))return ContentService.createTextOutput(callback+'('+text+');').setMimeType(ContentService.MimeType.JAVASCRIPT);\n  return ContentService.createTextOutput(text).setMimeType(ContentService.MimeType.JSON);\n}\n";
+window.SF_ADMIN_ACCOUNTS_CODE="/**\n * SmartForms Accounts 26.0 — một tài khoản quản trị cho mỗi dự án / URL.\n * 1. Tạo dự án Apps Script RIÊNG, dán toàn bộ tệp này.\n * 2. Chạy setupSmartFormsAdmin, cấp quyền và giữ mã đăng ký trong Nhật ký.\n * 3. Triển khai Web App: Thực thi bằng Tôi / Người có quyền truy cập: Bất kỳ ai.\n * 4. Dán URL /exec và mã đăng ký vào mục Tài khoản admin trên website.\n * Tài khoản + cấu hình được lưu trong tệp riêng trên Drive của chủ dự án.\n * PDF/Word và hồ sơ vẫn nằm ở kho Drive đã cấu hình; không lưu mật khẩu gốc.\n * Cập nhật mã: triển khai phiên bản mới trên cùng lượt triển khai để giữ URL.\n * https://developers.google.com/apps-script/guides/web\n */\nconst SF_ADMIN_VERSION=26;\n// Mã mẫu; khu kích hoạt sẽ điền mã trường và tài khoản riêng.\nconst SF_ADMIN_SCHOOL=null;\nconst SF_ADMIN_FILE='SMARTFORMS_ADMIN_STORE_ID';\nconst SF_ADMIN_SESSION_MS=6*60*60*1000;\n\nfunction setupSmartFormsAdmin(){\n  UrlFetchApp.getRequest('https://is.gd/create.php'); // Xin quyền kết nối dịch vụ rút link khi thiết lập.\n  const lock=LockService.getScriptLock();lock.waitLock(10000);\n  try{\n    const props=PropertiesService.getScriptProperties();\n    if(!props.getProperty(SF_ADMIN_FILE)){\n      const initial={format:26,school:SF_ADMIN_SCHOOL,account:null,epoch:0,config:{version:0,drive:{},gmail:{}}};\n      const file=DriveApp.createFile('SmartForms - Tai khoan admin va cau hinh.json',JSON.stringify(initial),MimeType.PLAIN_TEXT);\n      props.setProperty(SF_ADMIN_FILE,file.getId());\n    }\n    const store=sfAdminRead_();\n    if(SF_ADMIN_SCHOOL&&store.school&&store.school.id!==SF_ADMIN_SCHOOL.id)throw new Error('Dự án này đã thuộc trường khác. Hãy tạo một dự án Apps Script mới.');\n    if(store.account){console.log('Đã có tài khoản '+store.account.username+'. Cấu hình và tài khoản được giữ nguyên.');return}\n    let code=props.getProperty('SMARTFORMS_ADMIN_REGISTER_CODE');\n    if(!code){code=sfAdminRandom_();props.setProperty('SMARTFORMS_ADMIN_REGISTER_CODE',code)}\n    console.log('SMARTFORMS_ADMIN_REGISTER_CODE = '+code);\n    console.log('Mã này chỉ dùng để đăng ký lần đầu. Sau đó đăng nhập bằng tên và mật khẩu.');\n  }finally{lock.releaseLock()}\n}\nfunction sfAdminRandom_(){return Utilities.getUuid().replace(/-/g,'')+Utilities.getUuid().replace(/-/g,'')}\nfunction sfAdminDigest_(value){return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,String(value),Utilities.Charset.UTF_8).map(function(b){return('0'+((b+256)%256).toString(16)).slice(-2)}).join('')}\nfunction sfAdminEqual_(a,b){a=String(a||'');b=String(b||'');let diff=a.length^b.length;for(let i=0;i<Math.max(a.length,b.length);i++)diff|=(a.charCodeAt(i)||0)^(b.charCodeAt(i)||0);return diff===0}\nfunction sfAdminRead_(){\n  const id=PropertiesService.getScriptProperties().getProperty(SF_ADMIN_FILE);\n  if(!id)throw new Error('Chưa cài đặt. Hãy chạy setupSmartFormsAdmin trong Apps Script.');\n  const value=JSON.parse(DriveApp.getFileById(id).getBlob().getDataAsString('UTF-8'));\n  if(value.format!==26||!value.config)throw new Error('Tệp tài khoản không hợp lệ. Hệ thống đã dừng để giữ dữ liệu.');\n  return value;\n}\nfunction sfAdminWrite_(store){\n  const text=JSON.stringify(store);\n  if(Utilities.newBlob(text).getBytes().length>60000)throw new Error('Cấu hình vượt giới hạn 60 KB. Không lưu PDF/Word vào cấu hình tài khoản.');\n  DriveApp.getFileById(PropertiesService.getScriptProperties().getProperty(SF_ADMIN_FILE)).setContent(text);\n}\nfunction sfAdminPublic_(store){const a=store.account,s=store.school||SF_ADMIN_SCHOOL||{};return{ok:true,service:'SmartForms Accounts',version:26,configured:!!a,username:a?a.username:'',salt:a?a.salt:'',iterations:a?a.iterations:180000,schoolId:s.id||'',schoolName:s.name||'',registrationUsername:s.username||''}}\nfunction sfAdminCredentials_(data){\n  const a={username:String(data.username||'').trim(),salt:String(data.salt||''),hash:String(data.hash||''),iterations:Number(data.iterations||180000)};\n  if(a.username.length<3||a.username.length>80||/[\\u0000-\\u001f]/.test(a.username))throw new Error('Tên đăng nhập cần 3–80 ký tự.');\n  if(!/^[A-Za-z0-9+/]{32}={0,2}$/.test(a.salt)||!/^[A-Za-z0-9+/]{43}=$/.test(a.hash)||!Number.isInteger(a.iterations)||a.iterations<180000||a.iterations>600000)throw new Error('Dữ liệu xác minh mật khẩu không hợp lệ. Hãy tải lại website.');\n  return a;\n}\nfunction sfAdminRate_(failed){\n  const props=PropertiesService.getScriptProperties(),now=Date.now();let item=JSON.parse(props.getProperty('SF26_AUTH_FAILURES')||'{}');\n  if(!item.until||now>=item.until)item={count:0,until:now+10*60*1000};\n  if(item.count>=12)throw new Error('Đã có nhiều lần xác minh sai. Vui lòng chờ 10 phút.');\n  if(failed){item.count++;props.setProperty('SF26_AUTH_FAILURES',JSON.stringify(item))}\n}\nfunction sfAdminSession_(store){\n  const props=PropertiesService.getScriptProperties(),all=props.getProperties(),now=Date.now();let valid=[];\n  Object.keys(all).filter(k=>k.indexOf('SF26_SESSION_')===0).forEach(function(k){let s;try{s=JSON.parse(all[k])}catch(e){}if(!s||s.expiresAt<=now||s.epoch!==store.epoch)props.deleteProperty(k);else valid.push({key:k,expiresAt:s.expiresAt})});\n  valid.sort((a,b)=>a.expiresAt-b.expiresAt);while(valid.length>=8)props.deleteProperty(valid.shift().key);\n  const token=sfAdminRandom_(),expiresAt=now+SF_ADMIN_SESSION_MS;\n  props.setProperty('SF26_SESSION_'+sfAdminDigest_(token),JSON.stringify({epoch:store.epoch,expiresAt:expiresAt}));\n  return{session:token,expiresAt:expiresAt,username:store.account.username,schoolName:(store.school||{}).name||'',recoveryCode:String(store.account.recoveryCode||''),config:store.config};\n}\nfunction sfAdminAuthorize_(store,token){\n  if(!store.account||!/^[a-f0-9]{64}$/.test(String(token||'')))throw new Error('SESSION_EXPIRED: Hãy đăng nhập lại tài khoản admin.');\n  const raw=PropertiesService.getScriptProperties().getProperty('SF26_SESSION_'+sfAdminDigest_(token));let session;\n  try{session=JSON.parse(raw||'null')}catch(e){}\n  if(!session||session.epoch!==store.epoch||session.expiresAt<=Date.now())throw new Error('SESSION_EXPIRED: Hãy đăng nhập lại tài khoản admin.');\n}\nfunction sfAdminConfig_(current,patch){\n  const next=JSON.parse(JSON.stringify(current||{version:0,drive:{},gmail:{}}));\n  function fields(old,values,keys){const out=Object.assign({},old||{});keys.forEach(function(k){if(!Object.prototype.hasOwnProperty.call(values||{},k))return;const v=values[k];if(typeof v==='boolean'){out[k]=v;return}if(typeof v!=='string')throw new Error('Cấu hình không hợp lệ.');if(v.trim()||k==='parentShortName')out[k]=v.trim()});return out}\n  if(patch.drive){\n    next.drive=fields(next.drive,patch.drive,['appsScriptUrl','appsScriptToken','folderUrl','publicSiteUrl','autoForms','autoApps','parentShortLink','parentShortName','parentShortSource','parentShortAt']);\n    const services=next.drive.driveServices||{};\n    ['write','read','public'].forEach(function(role){services[role]=fields(services[role],patch.drive.driveServices&&patch.drive.driveServices[role],['appsScriptUrl','appsScriptToken'])});next.drive.driveServices=services;\n    if(patch.drive.formFolders){const folders={};Object.keys(patch.drive.formFolders).forEach(function(k){if(['__proto__','constructor','prototype'].indexOf(k)>=0)throw new Error('Mã biểu mẫu không hợp lệ.');folders[k]=String(patch.drive.formFolders[k]||'').trim()});next.drive.formFolders=folders}\n  }\n  if(patch.gmail)next.gmail=fields(next.gmail,patch.gmail,['appsScriptUrl','appsScriptToken']);\n  [next.drive,next.gmail].concat(Object.values(next.drive.driveServices||{})).forEach(function(s){if(s.appsScriptUrl&&!/^https:\\/\\/script\\.google\\.com\\/macros\\/s\\/[\\w-]+\\/exec$/.test(s.appsScriptUrl))throw new Error('URL Apps Script trong cấu hình chưa đúng.');if(String(s.appsScriptToken||'').length>500)throw new Error('Token vượt giới hạn.')});\n  next.version=Number(current.version||0)+1;next.updatedAt=new Date().toISOString();return next;\n}\n/* Liên kết phụ huynh 27: gọi dịch vụ từ máy chủ; có liên kết riêng dự phòng. */\nfunction sfShortError_(code,message){const e=new Error(message);e.sfCode=code;return e}\nfunction sfShortTarget_(value,site){\n  const target=String(value||'').trim(),base=String(site||'').trim().split(/[?#]/)[0];\n  if(target.length>3500||!/^https:\\/\\/[^\\s?#@]+(?:\\/[^\\s?#]*)?\\?/.test(target)||target.indexOf('#')>=0)throw sfShortError_('INVALID_URL','Hãy dùng link phụ huynh HTTPS do hệ thống tạo.');\n  if(base&&target.split('?')[0].replace(/\\/$/,'')!==base.replace(/\\/$/,''))throw sfShortError_('INVALID_URL','Link không thuộc website đã lưu. Hãy lưu lại địa chỉ website trước.');\n  const query={};target.split('?').slice(1).join('?').split('&').forEach(function(pair){\n    const parts=pair.split('='),key=decodeURIComponent(parts[0]),value=decodeURIComponent(parts.slice(1).join('=').replace(/\\+/g,' '));\n    if(['view','sf','sf_service','sf_folder'].indexOf(key)<0||Object.prototype.hasOwnProperty.call(query,key))throw sfShortError_('INVALID_URL','Tham số link phụ huynh không hợp lệ.');query[key]=value;\n  });\n  if(query.view!=='parent'||!(query.sf&&/^[\\w-]{20,}$/.test(query.sf)||query.sf_service&&/^https:\\/\\/script\\.google\\.com\\/macros\\/s\\/[\\w-]+\\/exec$/.test(query.sf_service)))throw sfShortError_('INVALID_URL','Link chưa có dịch vụ phụ huynh hợp lệ.');\n  return target;\n}\nfunction sfShortCreate_(target,alias,force){\n  alias=String(alias||'').trim();if(alias&&!/^[A-Za-z0-9_]{5,30}$/.test(alias))throw sfShortError_('ALIAS','Tên link cần 5–30 chữ, số hoặc dấu gạch dưới.');\n  const props=PropertiesService.getScriptProperties(),own=String(ScriptApp.getService().getUrl()||'');\n  let payload={format:'json',url:target};if(alias)payload.shorturl=alias;else if(force)payload.shorturl='sf_'+Utilities.getUuid().replace(/-/g,'').slice(0,12);\n  for(const service of ['https://is.gd/create.php','https://v.gd/create.php']){\n    try{\n      const result=JSON.parse(UrlFetchApp.fetch(service,{method:'post',payload:payload,muteHttpExceptions:true,followRedirects:true}).getContentText());\n      if(/^https:\\/\\/(is\\.gd|v\\.gd)\\/[A-Za-z0-9_]+$/.test(String(result.shorturl||'')))return{short:String(result.shorturl),service:service.indexOf('is.gd')>=0?'is.gd':'v.gd'};\n    }catch(error){}\n  }\n  if(!/^https:\\/\\/script\\.google\\.com\\/macros\\/s\\/[\\w-]+\\/exec$/.test(own))throw sfShortError_('NETWORK','Hãy triển khai Apps Script dưới dạng Ứng dụng web để tạo link riêng.');\n  const key=alias||'sf_'+Utilities.getUuid().replace(/-/g,'').slice(0,12),property='SF27_PARENT_LINK_'+key;\n  const old=props.getProperty(property);if(old&&old!==target)throw sfShortError_('ALIAS','Tên link riêng đã trỏ tới cổng khác. Hãy chọn tên khác.');\n  // Mỗi tên được giữ nguyên đích; tạo link mới không đổi đích của link đã gửi.\n  props.setProperty(property,target);return{short:own+'?sf_link='+encodeURIComponent(key),service:'private'};\n}\nfunction sfShortRedirect_(key){\n  const safe=v=>String(v).replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[c]));\n  let target='';try{if(!/^[A-Za-z0-9_]{5,30}$/.test(String(key||'')))throw new Error();target=sfShortTarget_(PropertiesService.getScriptProperties().getProperty('SF27_PARENT_LINK_'+key),'')}catch(error){}\n  const content=target?'<h1>Cổng phụ huynh</h1><p>Bấm nút bên dưới để mở biểu mẫu và tra cứu hồ sơ.</p><a class=\"button\" target=\"_top\" rel=\"noopener\" href=\"'+safe(target)+'\">Mở cổng phụ huynh →</a>':'<h1>Không tìm thấy liên kết</h1><p>Vui lòng liên hệ nhà trường để nhận lại link phụ huynh.</p>';\n  return HtmlService.createHtmlOutput('<!doctype html><html lang=\"vi\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><base target=\"_top\"><style>body{margin:0;background:#f3f7fc;font:17px/1.6 system-ui;color:#183853}main{max-width:520px;margin:10vh auto;padding:32px;background:white;border-radius:20px;box-shadow:0 10px 30px #142a4914}h1{font-size:26px}.button{display:inline-block;background:#2256d8;color:white;text-decoration:none;padding:13px 20px;border-radius:12px;font-weight:700}@media(max-width:600px){main{margin:30px 16px;padding:24px}}</style></head><body><main>'+content+'</main></body></html>').setTitle('Cổng phụ huynh');\n}\n\nfunction sfAdminShorten_(store,data){\n  const drive=store.config.drive||{},url=sfShortTarget_(data.url,drive.publicSiteUrl||data.publicSiteUrl),alias=String(data.alias||'').trim(),previousVersion=Number(store.config.version||0);\n  if(!data.force&&drive.parentShortSource===url&&String(drive.parentShortName||'')===alias&&drive.parentShortLink)return{short:drive.parentShortLink,version:previousVersion,previousVersion:previousVersion};\n  const result=sfShortCreate_(url,alias,!!data.force);\n  store.config=sfAdminConfig_(store.config,{drive:{parentShortLink:result.short,parentShortName:alias,parentShortSource:url,parentShortAt:new Date().toISOString()}});sfAdminWrite_(store);\n  return Object.assign(result,{version:store.config.version,previousVersion:previousVersion,updatedAt:store.config.updatedAt});\n}\nfunction sfAdminDispatch_(data){\n  const store=sfAdminRead_(),props=PropertiesService.getScriptProperties(),action=String(data.action||'');\n  if(action==='accountRegister'){\n    if(store.account)throw new Error('URL này đã có tài khoản admin. Hãy chọn Đăng nhập.');\n    const school=store.school||SF_ADMIN_SCHOOL;\n    if(school&&(!sfAdminEqual_(school.id,data.schoolId)||!sfAdminEqual_(school.username,String(data.username||'').trim())))throw new Error('Mã Apps Script không thuộc trường hoặc tài khoản đang kích hoạt.');\n    if(school)store.school=school;\n    sfAdminRate_(false);const code=props.getProperty('SMARTFORMS_ADMIN_REGISTER_CODE');\n    if(!code||!sfAdminEqual_(code,data.registerCode)){sfAdminRate_(true);throw new Error('Mã đăng ký không đúng. Hãy lấy mã trong Nhật ký setupSmartFormsAdmin.')}\n    const account=sfAdminCredentials_(data),recoveryCode=sfAdminRandom_();account.recoveryHash=sfAdminDigest_(recoveryCode);account.recoveryCode=recoveryCode;store.account=account;store.epoch=1;\n    store.config=sfAdminConfig_(store.config,data.config||{});sfAdminWrite_(store);props.deleteProperty('SMARTFORMS_ADMIN_REGISTER_CODE');props.deleteProperty('SF26_AUTH_FAILURES');\n    return Object.assign(sfAdminSession_(store),{recoveryCode:recoveryCode});\n  }\n  if(action==='accountLogin'){\n    sfAdminRate_(false);\n    if(!store.account||!sfAdminEqual_(store.account.username,String(data.username||'').trim())||!sfAdminEqual_(store.account.hash,data.hash)){sfAdminRate_(true);throw new Error('Tên đăng nhập hoặc mật khẩu không đúng.')}\n    props.deleteProperty('SF26_AUTH_FAILURES');return sfAdminSession_(store);\n  }\n  if(action==='accountRecover'){\n    sfAdminRate_(false);\n    if(!store.account||!sfAdminEqual_(store.account.username,String(data.username||'').trim())||!sfAdminEqual_(store.account.recoveryHash,sfAdminDigest_(String(data.recoveryCode||'')))){sfAdminRate_(true);throw new Error('Tên đăng nhập hoặc mã khôi phục không đúng.')}\n    const account=sfAdminCredentials_(data),recoveryCode=sfAdminRandom_();account.recoveryHash=sfAdminDigest_(recoveryCode);account.recoveryCode=recoveryCode;store.account=account;store.epoch++;sfAdminWrite_(store);props.deleteProperty('SF26_AUTH_FAILURES');\n    return Object.assign(sfAdminSession_(store),{recoveryCode:recoveryCode});\n  }\n  sfAdminAuthorize_(store,data.session);\n  if(action==='accountRecoveryGet')return{recoveryCode:String(store.account.recoveryCode||''),canRotate:true};\n  if(action==='accountRecoveryRotate'){\n    const recoveryCode=sfAdminRandom_();store.account.recoveryCode=recoveryCode;store.account.recoveryHash=sfAdminDigest_(recoveryCode);sfAdminWrite_(store);return{recoveryCode:recoveryCode};\n  }\n  if(action==='accountConfigGet')return{config:store.config,username:store.account.username};\n  if(action==='accountConfigSave'){\n    if(Number(data.expectedVersion)!==Number(store.config.version))throw new Error('CONFIG_CONFLICT: Cấu hình đã đổi trên máy khác. Hãy lấy cấu hình tài khoản trước khi sửa lại.');\n    store.config=sfAdminConfig_(store.config,data.config||{});sfAdminWrite_(store);return{version:store.config.version,updatedAt:store.config.updatedAt};\n  }\n  if(action==='accountChange'){\n    sfAdminRate_(false);if(!sfAdminEqual_(store.account.hash,data.currentHash)){sfAdminRate_(true);throw new Error('Mật khẩu hiện tại không đúng.')}\n    const next=sfAdminCredentials_(data);next.recoveryHash=store.account.recoveryHash;next.recoveryCode=store.account.recoveryCode||'';store.account=next;store.epoch++;sfAdminWrite_(store);props.deleteProperty('SF26_AUTH_FAILURES');return sfAdminSession_(store);\n  }\n  if(action==='accountLogout'){props.deleteProperty('SF26_SESSION_'+sfAdminDigest_(data.session));return{signedOut:true}}\n  if(action==='accountShorten')return sfAdminShorten_(store,data);\n  throw new Error('Chức năng không được hỗ trợ trong dự án Tài khoản admin.');\n}\n// Kết quả riêng chỉ đọc được bằng hai mã ngẫu nhiên của yêu cầu POST, hết hạn sau 180 giây.\nfunction sfAdminReceiptKey_(id,key){if(!/^[a-f0-9]{64}$/.test(String(id||''))||!/^[a-f0-9]{64}$/.test(String(key||'')))throw new Error('Mã yêu cầu không hợp lệ.');return'SF26_RESULT_'+sfAdminDigest_(id+'|'+key)}\nfunction doPost(e){\n  let data,key;try{if(String(e.postData.contents||'').length>65000)throw new Error('Yêu cầu quá lớn.');data=JSON.parse(e.postData.contents);key=sfAdminReceiptKey_(data.requestId,data.responseKey)}catch(error){return ContentService.createTextOutput('invalid request')}\n  const cache=CacheService.getScriptCache(),lock=LockService.getScriptLock();let locked=false;\n  try{\n    lock.waitLock(15000);locked=true;if(cache.get(key))return ContentService.createTextOutput('accepted');\n    const result=sfAdminDispatch_(data);cache.put(key,JSON.stringify({ok:true,data:result}),180);\n  }catch(error){cache.put(key,JSON.stringify({ok:false,error:String(error.message||error),code:error.sfCode||''}),180)}finally{if(locked)lock.releaseLock()}\n  return ContentService.createTextOutput('accepted');\n}\nfunction doGet(e){\n  const q=e.parameter||{},callback=String(q.callback||'');if(q.sf_link)return sfShortRedirect_(q.sf_link);let result;\n  try{\n    if(q.action==='accountInfo')result=sfAdminPublic_(sfAdminRead_());\n    else if(q.action==='accountResult'){const key=sfAdminReceiptKey_(q.requestId,q.responseKey),raw=CacheService.getScriptCache().get(key);result=raw?JSON.parse(raw):{ok:true,pending:true}}\n    else result={ok:false,error:'Đây là dịch vụ Tài khoản admin. Hãy mở website để đăng nhập.'};\n  }catch(error){result={ok:false,error:String(error.message||error)}}\n  const text=JSON.stringify(result);\n  if(callback&&/^[A-Za-z_$][A-Za-z0-9_$]{0,100}$/.test(callback))return ContentService.createTextOutput(callback+'('+text+');').setMimeType(ContentService.MimeType.JAVASCRIPT);\n  return ContentService.createTextOutput(text).setMimeType(ContentService.MimeType.JSON);\n}\n";
 /* ===== SmartForms 26 · Apps Script riêng cho tài khoản quản trị ===== */
 (function installSmartForms26(){
  'use strict';
@@ -6601,7 +6632,7 @@ window.SF_ADMIN_ACCOUNTS_CODE="/**\n * SmartForms Accounts 26.0 — một tài k
  function keepSession(endpoint,result){sessionStorage.setItem(sessionKey(endpoint),JSON.stringify({session:result.session,expiresAt:result.expiresAt,username:result.username}))}
  function same(db){if(DB!==db)throw new Error('Tài khoản đang thay đổi. Hãy mở lại cấu hình trước khi lưu.')}
  function random(){return Array.from(crypto.getRandomValues(new Uint8Array(32)),v=>v.toString(16).padStart(2,'0')).join('')}
- async function info(endpoint){endpoint=url(endpoint);if(!endpoint)throw new Error('Hãy nhập URL Apps Script Tài khoản admin kết thúc bằng /exec.');const result=await rawJsonp(endpoint,{action:'accountInfo'},25000);if(!result?.ok)throw new Error(result?.error||'Không kết nối được dịch vụ tài khoản.');if(result.service!=='SmartForms Accounts'||result.version!==26)throw new Error('URL này chưa có mã Tài khoản admin. Nếu là URL Writer cũ, dùng nút đăng nhập tài khoản cũ.');return result}
+ async function info(endpoint){endpoint=url(endpoint);if(!endpoint)throw new Error('Hãy nhập URL Apps Script Tài khoản admin kết thúc bằng /exec.');const result=await rawJsonp(endpoint,{action:'accountInfo'},25000);if(!result?.ok)throw new Error(result?.error||'Không kết nối được dịch vụ tài khoản.');if(result.service!=='SmartForms Accounts'||result.version!==26)throw new Error('URL này chưa có mã Tài khoản admin. Hãy dùng khu Đã có tài khoản nếu đây là URL Ghi dữ liệu cũ.');return result}
  async function rpc(endpoint,action,payload={},token){
   endpoint=url(endpoint);if(!endpoint)throw new Error('Chưa có URL dịch vụ tài khoản.');
   const requestId=random(),responseKey=random(),s=token||session(endpoint)?.session||'',controller=new AbortController(),timer=setTimeout(()=>controller.abort(),65000),started=Date.now();
@@ -6610,7 +6641,7 @@ window.SF_ADMIN_ACCOUNTS_CODE="/**\n * SmartForms Accounts 26.0 — một tài k
    while(Date.now()-started<65000){
     await driveWait(700);const response=await rawJsonp(endpoint,{action:'accountResult',requestId,responseKey},18000);
     if(response?.pending)continue;
-    if(!response?.ok){const message=String(response?.error||'Dịch vụ tài khoản chưa xác nhận.');if(message.includes('SESSION_EXPIRED'))sessionStorage.removeItem(sessionKey(endpoint));throw new Error(message.replace('SESSION_EXPIRED: ','').replace('CONFIG_CONFLICT: ',''))}
+    if(!response?.ok){const message=String(response?.error||'Dịch vụ tài khoản chưa xác nhận.');if(message.includes('SESSION_EXPIRED')){sessionStorage.removeItem(sessionKey(endpoint));clearSecrets(endpoint);if(endpoint===url(w.currentAdminEndpoint())){state.admin=false;await renderAdminGate()}}const error=new Error(message.replace('SESSION_EXPIRED: ','').replace('CONFIG_CONFLICT: ',''));error.code=response?.code||(message.includes('CONFIG_CONFLICT')?'CONFIG_CONFLICT':message.includes('SESSION_EXPIRED')?'SESSION_EXPIRED':'');throw error}
     return response.data||{};
    }
    throw new Error('Chưa nhận được xác nhận từ dịch vụ tài khoản. Cấu hình trên thiết bị vẫn được giữ. Nếu vừa đăng ký, hãy thử Đăng nhập.');
@@ -6640,19 +6671,19 @@ window.SF_ADMIN_ACCOUNTS_CODE="/**\n * SmartForms Accounts 26.0 — một tài k
  function adminLink(base){const endpoint=url(w.currentAdminEndpoint());if(!linked())return'';const u=new URL(w.adminShareUrl(endpoint,base||location.href));u.searchParams.set('sf_auth','26');return u.toString()}
  function notice(message,kind='ok'){let box=q('#sf26AccountNotice');if(!box){box=document.createElement('div');box.id='sf26AccountNotice';q('#adminApp')?.prepend(box)}box.className='notice '+kind;box.style.marginBottom='14px';box.textContent=message}
  function showRecovery(code){
-  if(code)recoveryPending=code;if(!recoveryPending||!state.admin)return;
+  if(code){recoveryPending=code;rememberSecrets('',code)}if(!recoveryPending||!state.admin)return;
   let box=q('#sf26RecoveryNotice');if(!box){box=document.createElement('div');box.id='sf26RecoveryNotice';q('#adminApp')?.prepend(box)}
-  box.className='notice warn';box.style.marginBottom='14px';box.innerHTML='<b>Lưu mã khôi phục tài khoản</b><p>Dùng mã này nếu quên mật khẩu. Mã chỉ hiển thị sau khi đăng ký hoặc khôi phục.</p><input readonly aria-label="Mã khôi phục" value="'+h(recoveryPending)+'"><div class="actions" style="margin-top:10px"><button class="btn secondary" data-copy-recovery>Sao chép mã</button><button class="btn ghost" data-close-recovery>Tôi đã lưu mã</button></div>';
+  box.className='notice warn';box.style.marginBottom='14px';box.innerHTML='<b>Lưu mã khôi phục tài khoản</b><p>Dùng mã này nếu quên mật khẩu. Có thể xem lại mã trong mục Tài khoản admin khi đang đăng nhập.</p><input readonly aria-label="Mã khôi phục" value="'+h(recoveryPending)+'"><div class="actions" style="margin-top:10px"><button class="btn secondary" data-copy-recovery>Sao chép mã</button><button class="btn ghost" data-close-recovery>Tôi đã lưu mã</button></div>';
   q('[data-copy-recovery]',box).onclick=async e=>{e.currentTarget.textContent=await copy(recoveryPending)?'Đã sao chép':'Hãy chọn và sao chép mã phía trên'};q('[data-close-recovery]',box).onclick=()=>{recoveryPending='';box.remove()};
  }
- async function enter(endpoint,account,result,snapshot){
+ async function enter(endpoint,account,result,snapshot,password=''){
   const target=w.accountKeyForEndpoint(endpoint);if(snapshot){let existing={};try{existing=JSON.parse(localStorage.getItem(target)||'{}')}catch{}if(existing.username&&(existing.username!==account.username||existing.salt!==account.salt))throw new Error('Trên thiết bị đã có dữ liệu tài khoản khác tại URL này. Hãy đăng nhập bằng cửa sổ trình duyệt riêng.')}
   await w.openWorkspaceDatabase(endpoint);
   if(snapshot)for(const store of ['settings','forms','apps','emails'])for(const item of snapshot[store]||[])await idbPut(store,cloneForStorage(item));
   w.setActiveEndpoint(endpoint);const link=new URL(w.adminShareUrl(endpoint,location.href));link.searchParams.set('sf_auth','26');history.replaceState(null,'',link.toString());
-  remember(endpoint);keepSession(endpoint,result);w.saveLocalAdminAccount(account);w.rememberAdminBinding(account.username,endpoint);w.saveRemoteAdminSession('sf26-accounts');state.admin=true;legacyGate=false;
+  remember(endpoint);keepSession(endpoint,result);w.saveLocalAdminAccount(account);w.rememberAdminBinding(account.username,endpoint);w.saveRemoteAdminSession('sf26-accounts');state.admin=true;legacyGate=false;rememberSecrets(password,result.recoveryCode||'',account,endpoint,result.expiresAt);
   await apply(result.config,true);w.configurePortalMode();writeUiSession({page:'admin',adminView:snapshot?'system':'dashboard'});
-  await renderAdminGate();showAdminView(snapshot?'system':'dashboard');showRecovery(result.recoveryCode);
+  await renderAdminGate();showAdminView(snapshot?'system':'dashboard');if(result.recoveryCreated)showRecovery(result.recoveryCode);
   const d=await idbGet('settings','drive')||{};
   if(!snapshot&&d.appsScriptUrl&&d.appsScriptToken&&d.folderUrl){
    notice('Đã đăng nhập. Đang tải biểu mẫu và hồ sơ đã đồng bộ từ Drive…','');
@@ -6660,30 +6691,210 @@ window.SF_ADMIN_ACCOUNTS_CODE="/**\n * SmartForms Accounts 26.0 — một tài k
    catch(error){notice('Đã đăng nhập và khôi phục cấu hình. Chưa tải được hồ sơ từ Drive: '+String(error?.message||error)+'. Vào Quản lý Drive & liên kết để lấy dữ liệu lại.','warn')}
   }else notice(snapshot?'Đã đăng ký tài khoản trực tuyến và giữ dữ liệu hiện có trên thiết bị. Hồ sơ cần đồng bộ lên Drive để mở trên máy khác.':'Đã đăng nhập. Hãy mở Thiết lập hệ thống để kết nối kho Drive và Gmail.');
  }
- async function credentials(username,password){if(password.length<8)throw new Error('Mật khẩu cần ít nhất 8 ký tự.');const salt=arrayBufferToBase64(crypto.getRandomValues(new Uint8Array(24)).buffer);return{username:username.trim(),salt,hash:await passwordHash(password,salt,180000),it:180000}}
- async function login(endpoint,username,password){endpoint=url(endpoint);const status=await info(endpoint);if(!status.configured)throw new Error('URL này chưa có tài khoản. Hãy chọn Đăng ký.');const account={username:username.trim(),salt:status.salt,hash:await passwordHash(password,status.salt,status.iterations),it:status.iterations};const result=await rpc(endpoint,'accountLogin',{username:account.username,hash:account.hash});await enter(endpoint,account,result);return result}
- async function register(endpoint,code,account,migrate=false){
+ async function credentials(username,password){if(password.length<8)throw new Error('Mật khẩu cần ít nhất 8 ký tự.');const salt=arrayBufferToBase64(crypto.getRandomValues(new Uint8Array(24)).buffer),account={username:username.trim(),salt,hash:await passwordHash(password,salt,180000),it:180000};preparedPasswords.set(account,password);return account}
+ async function login(endpoint,username,password){endpoint=url(endpoint);const status=await info(endpoint);if(!status.configured)throw new Error('URL này chưa có tài khoản. Hãy chọn Đăng ký.');const account={username:username.trim(),salt:status.salt,hash:await passwordHash(password,status.salt,status.iterations),it:status.iterations};const result=await rpc(endpoint,'accountLogin',{username:account.username,hash:account.hash});await enter(endpoint,account,result,null,password);return result}
+ async function register(endpoint,code,account,migrate=false,school=null){
   endpoint=url(endpoint);const status=await info(endpoint);if(status.configured)throw new Error('URL này đã có tài khoản. Hãy chọn Đăng nhập.');
+  if(school&&(status.schoolId!==school.id||status.registrationUsername!==account.username))throw new Error('URL này không thuộc mã riêng vừa tạo cho trường. Hãy dán và triển khai đúng mã trường trước.');
   if(migrate&&!state.admin)throw new Error('Hãy đăng nhập tài khoản hiện tại trước khi chuyển.');
   if(migrate){let target={};try{target=JSON.parse(localStorage.getItem(w.accountKeyForEndpoint(endpoint))||'{}')}catch{}if(target.username&&(target.username!==account.username||target.salt!==account.salt))throw new Error('Trên thiết bị đã có dữ liệu tài khoản khác tại URL này. Hãy dùng cửa sổ trình duyệt riêng.')}
   const db=DB,snapshot=migrate?await w.snapshotCurrentWorkspace():null,config=migrate?await snapshotConfig():{};same(db);
-  const result=await rpc(endpoint,'accountRegister',{username:account.username,salt:account.salt,hash:account.hash,iterations:account.it,registerCode:code.trim(),config});same(db);
-  await enter(endpoint,account,result,snapshot);return result;
+  const result=await rpc(endpoint,'accountRegister',{username:account.username,salt:account.salt,hash:account.hash,iterations:account.it,registerCode:code.trim(),schoolId:school?.id||status.schoolId||'',config});same(db);
+  result.recoveryCreated=true;const password=preparedPasswords.get(account)||(migrate?secretState().password||'':'');const safeAccount={username:account.username,salt:account.salt,hash:account.hash,it:account.it};await enter(endpoint,safeAccount,result,snapshot,password);return result;
  }
- async function recover(endpoint,username,code,password){endpoint=url(endpoint);await info(endpoint);const account=await credentials(username,password);const result=await rpc(endpoint,'accountRecover',{username:account.username,salt:account.salt,hash:account.hash,iterations:account.it,recoveryCode:code.trim()});await enter(endpoint,account,result);return result}
- async function shorten(longUrl,alias,force=false){await saveConfig('drive');const db=DB,result=await rpc(url(w.currentAdminEndpoint()),'accountShorten',{url:longUrl,alias,force});same(db);const meta=await idbGet('settings',META);await idbPut('settings',{...meta,id:META,version:result.version,savedAt:result.updatedAt||meta.savedAt});return{...result,cloudSaved:true}}
+ async function recover(endpoint,username,code,password){
+  endpoint=url(endpoint);const status=await lookup(endpoint),account=await credentials(username,password);
+  if(status.kind==='writer'){await w.sharedPublicPostAt(endpoint,{action:'adminPasswordReset',username:account.username,salt:account.salt,hash:account.hash,iterations:account.it,recoveryCode:code.trim()},65000);await w.loginRemoteAdminFromBase(endpoint,username,password);return}
+  const result=await rpc(endpoint,'accountRecover',{username:account.username,salt:account.salt,hash:account.hash,iterations:account.it,recoveryCode:code.trim()});result.recoveryCreated=true;await enter(endpoint,account,result,null,password);return result;
+ }
+ async function shortenNow(longUrl,alias,force){
+  const db=DB,endpoint=url(w.currentAdminEndpoint()),d=await idbGet('settings','drive')||{},meta=await idbGet('settings',META);same(db);
+  if(!state.admin||!session(endpoint))throw Object.assign(new Error('Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại tài khoản trường.'),{code:'SESSION_EXPIRED'});
+  const result=await rpc(endpoint,'accountShorten',{url:longUrl,alias,force,publicSiteUrl:d.publicSiteUrl||''});same(db);
+  if(!sf27ValidShort(result.short,endpoint))throw new Error('Dịch vụ trả về link rút gọn không hợp lệ.');
+  if(meta&&Number(meta.version)===Number(result.previousVersion))await idbPut('settings',{...meta,id:META,version:result.version,savedAt:result.updatedAt||meta.savedAt});
+  return{...result,cloudSaved:true};
+ }
+ function shorten(longUrl,alias,force=false){const result=saveQueue.catch(()=>{}).then(()=>shortenNow(longUrl,alias,force));saveQueue=result;return result}
+
  async function copy(value){try{await navigator.clipboard.writeText(value);return true}catch{const t=document.createElement('textarea');t.value=value;document.body.appendChild(t);t.select();const ok=document.execCommand('copy');t.remove();return ok}}
- function downloadCode(){const data=new Blob([window.SF_ADMIN_ACCOUNTS_CODE],{type:'text/plain;charset=utf-8'}),a=document.createElement('a'),href=URL.createObjectURL(data);a.href=href;a.download='SF_Admin_Accounts.gs';a.click();setTimeout(()=>URL.revokeObjectURL(href),1000)}
+ function downloadCode(code=window.SF_ADMIN_ACCOUNTS_CODE,filename='SF_Admin_Accounts.gs'){const data=new Blob([code],{type:'text/plain;charset=utf-8'}),a=document.createElement('a'),href=URL.createObjectURL(data);a.href=href;a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(href),1000)}
  function codePanel(){return'<details class="setup-guide sf26-code"><summary>Mã Apps Script riêng · Tài khoản admin</summary><ol><li>Tạo dự án Apps Script mới, dán toàn bộ mã <b>SF_Admin_Accounts.gs</b> bên dưới.</li><li>Chạy <b>setupSmartFormsAdmin</b>, cấp quyền và sao chép <b>SMARTFORMS_ADMIN_REGISTER_CODE</b> trong Nhật ký thực thi.</li><li>Triển khai dưới dạng <b>Ứng dụng web</b>: Thực thi bằng <b>Tôi</b>, quyền truy cập <b>Bất kỳ ai</b>.</li><li>Dán URL <b>/exec</b> và mã đăng ký vào biểu mẫu đăng ký. Mỗi dự án lưu một tài khoản admin riêng.</li></ol><div class="actions"><button type="button" class="btn secondary" data-sf26-copy>Sao chép mã tài khoản</button><button type="button" class="btn ghost" data-sf26-download>Tải SF_Admin_Accounts.gs</button></div><textarea data-sf26-code readonly spellcheck="false" aria-label="Mã Apps Script tài khoản" style="width:100%;min-height:260px;margin-top:12px;font:12px/1.5 monospace"></textarea></details>'}
- function bindCode(root){for(const area of root.querySelectorAll('[data-sf26-code]'))area.value=window.SF_ADMIN_ACCOUNTS_CODE;for(const button of root.querySelectorAll('[data-sf26-copy]'))button.onclick=async()=>{button.textContent=await copy(window.SF_ADMIN_ACCOUNTS_CODE)?'Đã sao chép':'Hãy chọn mã và sao chép thủ công'};for(const button of root.querySelectorAll('[data-sf26-download]'))button.onclick=downloadCode}
- function lastUrl(){try{return linked()?url(w.currentAdminEndpoint()):url(localStorage.getItem(LAST)||'')}catch{return''}}
+ function bindCode(root){for(const area of root.querySelectorAll('[data-sf26-code]'))area.value=window.SF_ADMIN_ACCOUNTS_CODE;for(const button of root.querySelectorAll('[data-sf26-copy]'))button.onclick=async()=>{button.textContent=await copy(window.SF_ADMIN_ACCOUNTS_CODE)?'Đã sao chép':'Hãy chọn mã và sao chép thủ công'};for(const button of root.querySelectorAll('[data-sf26-download]'))button.onclick=()=>downloadCode()}
+ function defaultAccount(){
+  for(const key of [w.accountKeyForEndpoint(''),'st_pdf_admin']){try{const a=JSON.parse(localStorage.getItem(key)||'{}');if(a.username&&a.salt&&a.hash)return a}catch{}}return{};
+ }
+ function lastUrl(){try{return url(w.currentAdminEndpoint())||url(localStorage.getItem(LAST)||'')}catch{return''}}
+ function schoolCode(profile){
+  const data={id:profile.id,name:profile.name,username:profile.username};
+  return window.SF_ADMIN_ACCOUNTS_CODE.replace('const SF_ADMIN_SCHOOL=null;','const SF_ADMIN_SCHOOL='+JSON.stringify(data).replace(/</g,'\\u003c').replace(/\u2028/g,'\\u2028').replace(/\u2029/g,'\\u2029')+';');
+ }
+ function readDraft(){try{const d=JSON.parse(sessionStorage.getItem('sf27_school_draft')||'null');return d&&/^[a-f0-9]{32}$/.test(d.id)&&typeof d.name==='string'&&typeof d.username==='string'?d:null}catch{return null}}
+ async function lookup(endpoint){
+  endpoint=url(endpoint);if(!endpoint)throw new Error('Dán URL Apps Script /exec hoặc link quản trị của nhà trường.');
+  let result,firstError;
+  try{result=await rawJsonp(endpoint,{action:'accountInfo'},18000)}catch(error){firstError=error}
+  if(result?.ok&&result.service==='SmartForms Accounts'&&result.version===26)return{...result,kind:'accounts',endpoint};
+  try{
+   const legacy=await rawJsonp(endpoint,{action:'adminStatus'},18000);
+   if(legacy?.ok&&String(legacy.apiVersion||'').includes('Shared Access 8.0'))return{...legacy,kind:'writer',endpoint};
+  }catch(error){if(!firstError)firstError=error}
+  throw new Error(result?.error||firstError?.message||'URL này chưa có dịch vụ tài khoản admin. Kiểm tra mã đã dán, quyền Bất kỳ ai và URL /exec.');
+ }
+ async function enterDefault(account,password=''){
+  state.admin=false;restored.delete(DB?.name);w.setActiveEndpoint('');
+  const base=new URL(location.href);base.search='';base.hash='';base.searchParams.set('view','admin');history.replaceState(null,'',base.toString());
+  await w.openWorkspaceDatabase('');const createdRecovery=!account.recoveryHash;account=await defaultRecovery(account);w.saveLocalAdminAccount(account);state.admin=true;legacyGate=false;rememberSecrets(password,account.recoveryCode||'',account,'');
+  w.configurePortalMode();writeUiSession({page:'admin',adminView:'dashboard'});await renderAdminGate();showAdminView('dashboard');if(createdRecovery)showRecovery(account.recoveryCode);
+ }
  function renderLogin(){
   const gate=q('#adminGate');if(!gate)return;gate.classList.remove('hidden');q('#adminApp')?.classList.add('hidden');
-  gate.innerHTML='<div class="card panel connection-card"><h2>Tài khoản admin</h2><p>Đăng nhập để lấy lại cấu hình và kho hồ sơ đã đồng bộ của tài khoản.</p><div class="sf16-tabs"><button class="sf16-tab active" type="button" data-account-mode="login">Đăng nhập</button><button class="sf16-tab" type="button" data-account-mode="register">Đăng ký</button><button class="sf16-tab" type="button" data-account-mode="recover">Quên mật khẩu</button></div><form id="sf26AuthForm" style="display:grid;gap:13px"><div class="field"><label>URL Apps Script Tài khoản admin hoặc link quản trị</label><input name="endpoint" required value="'+h(lastUrl())+'" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off"></div><div class="field"><label>Tên đăng nhập</label><input name="username" required minlength="3" maxlength="80" autocomplete="username"></div><div class="field hidden" data-registration><label>Mã đăng ký lần đầu</label><input name="registerCode" type="password" autocomplete="off"><div class="field-hint">Lấy trong Nhật ký sau khi chạy setupSmartFormsAdmin.</div></div><div class="field hidden" data-recovery><label>Mã khôi phục</label><input name="recoveryCode" type="password" autocomplete="off"></div><div class="field"><label data-password-label>Mật khẩu</label><input name="password" type="password" required autocomplete="current-password"></div><div class="field hidden" data-confirm><label>Nhập lại mật khẩu</label><input name="password2" type="password" autocomplete="new-password"></div><button class="btn primary" type="submit">Đăng nhập</button></form><div id="sf26AuthProgress" role="status" aria-live="polite" style="margin-top:12px"></div><div style="margin-top:16px">'+codePanel()+'</div><button class="btn ghost" type="button" id="sf26Legacy" style="width:100%;margin-top:12px">Dùng tài khoản cũ trên thiết bị / Writer</button></div>';
-  const form=q('#sf26AuthForm'),box=q('#sf26AuthProgress');let mode='login';
-  for(const button of gate.querySelectorAll('[data-account-mode]'))button.onclick=()=>{mode=button.dataset.accountMode;for(const tab of gate.querySelectorAll('[data-account-mode]'))tab.classList.toggle('active',tab===button);for(const [selector,visible] of [['[data-registration]',mode==='register'],['[data-recovery]',mode==='recover'],['[data-confirm]',mode!=='login']])q(selector,gate).classList.toggle('hidden',!visible);form.elements.registerCode.required=mode==='register';form.elements.recoveryCode.required=mode==='recover';form.elements.password2.required=mode!=='login';form.elements.password.minLength=mode==='login'?0:8;form.elements.password.autocomplete=mode==='login'?'current-password':'new-password';q('[data-password-label]',form).textContent=mode==='recover'?'Mật khẩu mới':'Mật khẩu';q('button[type=submit]',form).textContent=mode==='login'?'Đăng nhập':mode==='register'?'Đăng ký tài khoản':'Khôi phục tài khoản';box.textContent=''};
-  form.onsubmit=async event=>{event.preventDefault();const button=event.submitter||q('button[type=submit]',form),label=button.textContent,data=Object.fromEntries(new FormData(form));button.disabled=true;box.textContent='Đang xác minh tài khoản…';try{if(mode!=='login'&&data.password!==data.password2)throw new Error('Hai lần nhập mật khẩu không khớp.');if(mode==='login')await login(data.endpoint,data.username,data.password);else if(mode==='register')await register(data.endpoint,data.registerCode,await credentials(data.username,data.password));else await recover(data.endpoint,data.username,data.recoveryCode,data.password)}catch(error){box.className='notice bad';box.textContent=String(error?.message||error)}finally{button.disabled=false;button.textContent=label}};
-  q('#sf26Legacy').onclick=async()=>{legacyGate=true;await originalGate();const back=document.createElement('button');back.className='btn secondary';back.textContent='← Tài khoản trực tuyến';back.onclick=()=>{legacyGate=false;renderLogin()};gate.prepend(back)};bindCode(gate);
+  const local=defaultAccount(),hasDefault=!!local.username;let draft=readDraft(),currentMode='login',requestNumber=0,lookupTimer=0,resolved=null,pending=false;
+  if(!q('#sf27AuthStyle')){const style=document.createElement('style');style.id='sf27AuthStyle';style.textContent=`
+   #sf27Login{max-width:700px;margin:24px auto}#sf27Login h2{margin:0 0 8px}#sf27Login h3{font-size:17px;margin:0 0 7px}
+   #sf27Login .sf27-intro{color:var(--muted);line-height:1.65;margin:0 0 20px}#sf27Login .sf27-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;background:#eef3f9;padding:6px;border-radius:14px;margin-bottom:22px}
+   #sf27Login .sf27-tabs button{padding:12px 8px;border:0;border-radius:10px;background:transparent;color:#52677f;font:inherit;font-size:13px;font-weight:800;cursor:pointer;line-height:1.45}
+   #sf27Login .sf27-tabs button.active{background:#fff;color:var(--pri);box-shadow:0 3px 9px #2256d815}#sf27Login .sf27-pane form{display:grid;gap:14px}
+   #sf27Login .sf27-note{font-size:13px;color:var(--muted);line-height:1.65;margin:0 0 16px}#sf27Login .sf27-step{border:1px solid var(--line);border-radius:16px;padding:18px;margin-top:15px}
+   #sf27Login .sf27-code textarea{width:100%;min-height:200px;font:12px/1.5 monospace;margin-top:12px}#sf27Login input[readonly]{background:#f0f5fb;color:#214264}
+   #sf27Login .sf27-status:empty{display:none}#sf27Login .sf27-status{margin:10px 0 0;line-height:1.65}#sf27Login label{font-size:13px}#sf27Login .btn{white-space:normal}
+   @media(max-width:520px){#sf27Login{padding:18px;margin:12px auto}#sf27Login .sf27-tabs button{font-size:11.5px;padding:10px 4px}#sf27Login .sf27-step{padding:14px}}
+  `;document.head.appendChild(style)}
+  gate.innerHTML=`<div class="card panel connection-card" id="sf27Login">
+   <h2>Đăng nhập quản trị</h2><p class="sf27-intro">Chọn khu vực phù hợp để mở tài khoản của nhà trường.</p>
+   <div class="sf27-tabs" role="tablist" aria-label="Khu vực tài khoản admin">
+    <button class="active" type="button" role="tab" aria-selected="true" aria-controls="sf27Have" id="sf27HaveTab" data-account-mode="login">Đã có tài khoản</button>
+    <button type="button" role="tab" aria-selected="false" aria-controls="sf27Activate" id="sf27ActivateTab" data-account-mode="register" tabindex="-1">Kích hoạt tài khoản riêng</button>
+    <button type="button" role="tab" aria-selected="false" aria-controls="sf27Default" id="sf27DefaultTab" data-account-mode="default" tabindex="-1">Admin mặc định</button>
+   </div>
+   <section id="sf27Have" class="sf27-pane" role="tabpanel" aria-labelledby="sf27HaveTab" data-account-pane="login">
+    <p class="sf27-note">Dán URL Apps Script của nhà trường. Hệ thống tự tìm tên tài khoản; bạn chỉ cần nhập mật khẩu.</p>
+    <form id="sf26AuthForm">
+     <div class="field"><label for="sf27Endpoint">URL Apps Script hoặc link quản trị</label><input id="sf27Endpoint" name="endpoint" required value="${h(lastUrl())}" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off" spellcheck="false"></div>
+     <div id="sf27LookupStatus" class="sf27-status" role="status" aria-live="polite"></div>
+     <div class="field"><label for="sf27Username">Tài khoản của nhà trường</label><input id="sf27Username" name="username" readonly required placeholder="Tự hiển thị sau khi kiểm tra URL" autocomplete="username"></div>
+     <div class="field"><label for="sf27Password" data-password-label>Mật khẩu</label><input id="sf27Password" name="password" type="password" required autocomplete="current-password" disabled></div>
+     <div class="field hidden" data-recovery><label for="sf27Recovery">Mã khôi phục</label><input id="sf27Recovery" name="recoveryCode" type="password" autocomplete="off" disabled></div>
+     <div class="field hidden" data-confirm><label for="sf27Password2">Nhập lại mật khẩu mới</label><input id="sf27Password2" name="password2" type="password" autocomplete="new-password" disabled></div>
+     <button class="btn primary" type="submit" disabled>Đăng nhập tài khoản trường</button>
+     <button class="btn ghost" type="button" id="sf27RecoverToggle" disabled>Quên mật khẩu?</button>
+    </form><div id="sf26AuthProgress" class="sf27-status" role="status" aria-live="polite"></div>
+   </section>
+   <section id="sf27Activate" class="sf27-pane hidden" role="tabpanel" aria-labelledby="sf27ActivateTab" data-account-pane="register">
+    <p class="sf27-note">Tạo mã Apps Script riêng cho trường, triển khai trong tài khoản Google của trường rồi kích hoạt đăng ký.</p>
+    <form id="sf27PrepareSchool">
+     <div class="field"><label for="sf27SchoolName">Tên trường</label><input id="sf27SchoolName" name="schoolName" required maxlength="160" placeholder="Ví dụ: Trường THCS Hồ Nghinh" value="${h(draft?.name||'')}" autocomplete="organization"></div>
+     <div class="field"><label for="sf27NewUsername">Tên tài khoản trường muốn đăng ký</label><input id="sf27NewUsername" name="username" required minlength="3" maxlength="80" placeholder="Ví dụ: admin_honghinh" value="${h(draft?.username||'')}" autocomplete="username"></div>
+     <button class="btn secondary" type="submit">Tạo mã Apps Script riêng cho trường</button>
+    </form><div id="sf27PrepareStatus" class="sf27-status" role="status" aria-live="polite"></div>
+    <div id="sf27SchoolSetup" class="hidden">
+     <div class="sf27-step"><h3>1. Thiết lập Apps Script riêng</h3><p id="sf27SchoolSummary" class="sf27-note"></p>
+      <ol class="setup-guide"><li><a href="https://script.google.com/home/start" target="_blank" rel="noopener">Tạo dự án Apps Script mới</a> trong tài khoản Google của trường.</li><li>Dán toàn bộ mã riêng bên dưới, lưu rồi chạy <b>setupSmartFormsAdmin</b> và cấp quyền.</li><li>Sao chép <b>SMARTFORMS_ADMIN_REGISTER_CODE</b> trong Nhật ký thực thi.</li><li>Chọn <b>Triển khai → Triển khai mới → Ứng dụng web</b>; thực thi bằng <b>Tôi</b>, quyền truy cập <b>Bất kỳ ai</b>. Sao chép URL kết thúc bằng <b>/exec</b>.</li></ol>
+      <div class="actions"><button class="btn secondary" type="button" id="sf27CopySchool">Sao chép mã riêng</button><button class="btn ghost" type="button" id="sf27DownloadSchool">Tải mã .gs</button></div>
+      <details class="sf27-code"><summary>Xem mã Apps Script của trường</summary><textarea id="sf27SchoolCode" readonly spellcheck="false" aria-label="Mã Apps Script riêng cho trường"></textarea></details>
+     </div>
+     <div class="sf27-step"><h3>2. Kích hoạt và đăng ký tài khoản trường</h3><form id="sf27ActivateForm">
+      <div class="field"><label for="sf27RegisterEndpoint">URL Apps Script vừa triển khai (/exec)</label><input id="sf27RegisterEndpoint" name="endpoint" required placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off" spellcheck="false"></div>
+      <div class="field"><label for="sf27RegisterCode">Mã kích hoạt đăng ký</label><input id="sf27RegisterCode" name="registerCode" type="password" required autocomplete="off"><div class="field-hint">Dán SMARTFORMS_ADMIN_REGISTER_CODE trong Nhật ký của dự án vừa tạo.</div></div>
+      <div class="field"><label for="sf27RegisterUsername">Tài khoản trường</label><input id="sf27RegisterUsername" name="username" readonly required autocomplete="username"></div>
+      <div class="field"><label for="sf27RegisterPassword">Mật khẩu</label><input id="sf27RegisterPassword" name="password" type="password" required minlength="8" autocomplete="new-password"></div>
+      <div class="field"><label for="sf27RegisterPassword2">Nhập lại mật khẩu</label><input id="sf27RegisterPassword2" name="password2" type="password" required minlength="8" autocomplete="new-password"></div>
+      <button class="btn primary" type="submit">Kích hoạt &amp; đăng ký tài khoản riêng</button>
+     </form><div id="sf27ActivateStatus" class="sf27-status" role="status" aria-live="polite"></div></div>
+    </div>
+   </section>
+   <section id="sf27Default" class="sf27-pane hidden" role="tabpanel" aria-labelledby="sf27DefaultTab" data-account-pane="default">
+    <h3>Admin mặc định</h3><p class="sf27-note">${hasDefault?'Đăng nhập tài khoản mặc định đã tạo trên trình duyệt này.':'Trình duyệt này chưa có admin mặc định. Tạo tài khoản lần đầu tại đây.'} Tài khoản này sử dụng dữ liệu của khu vực mặc định trên thiết bị.</p>
+    <form id="sf27DefaultForm">
+     <div class="field"><label for="sf27DefaultUsername">Tên tài khoản mặc định</label><input id="sf27DefaultUsername" name="username" required minlength="3" maxlength="80" value="${h(local.username||'')}" autocomplete="username"></div>
+     <div class="field"><label for="sf27DefaultPassword">Mật khẩu</label><input id="sf27DefaultPassword" name="password" type="password" required ${hasDefault?'':'minlength="8"'} autocomplete="${hasDefault?'current-password':'new-password'}"></div>
+     ${hasDefault?'':'<div class="field"><label for="sf27DefaultPassword2">Nhập lại mật khẩu</label><input id="sf27DefaultPassword2" name="password2" type="password" required minlength="8" autocomplete="new-password"></div>'}
+     <button class="btn primary" type="submit">${hasDefault?'Đăng nhập admin mặc định':'Tạo admin mặc định'}</button>
+    </form><div id="sf27DefaultStatus" class="sf27-status" role="status" aria-live="polite"></div>
+    ${hasDefault?'<button class="btn ghost" type="button" id="sf28DefaultForgot" style="margin-top:12px" aria-expanded="false">Quên mật khẩu admin mặc định?</button><section id="sf28DefaultRecoveryPanel" class="sf27-step hidden"><h3>Khôi phục admin mặc định</h3><p class="sf27-note">Dùng mã đã sao chép trong mục Tài khoản admin của trình duyệt này.</p><form id="sf28DefaultRecoveryForm"><div class="field"><label for="sf28DefaultRecoverUsername">Tên tài khoản</label><input id="sf28DefaultRecoverUsername" name="username" required autocomplete="username" value="'+h(local.username||'')+'"></div><div class="field"><label for="sf28DefaultRecoverCode">Mã khôi phục</label><input id="sf28DefaultRecoverCode" name="recoveryCode" type="password" required autocomplete="off"></div><div class="field"><label for="sf28DefaultRecoverPassword">Mật khẩu mới</label><input id="sf28DefaultRecoverPassword" name="password" type="password" minlength="8" required autocomplete="new-password"></div><div class="field"><label for="sf28DefaultRecoverPassword2">Nhập lại mật khẩu mới</label><input id="sf28DefaultRecoverPassword2" name="password2" type="password" minlength="8" required autocomplete="new-password"></div><button class="btn primary" type="submit">Đặt mật khẩu mới và đăng nhập</button></form><div id="sf28DefaultRecoveryStatus" class="sf27-status" role="status" aria-live="polite"></div></section>':''}
+   </section>
+  </div>`;
+  const form=q('#sf26AuthForm'),box=q('#sf26AuthProgress'),checkBox=q('#sf27LookupStatus'),submit=q('button[type=submit]',form),recoveryToggle=q('#sf27RecoverToggle');let recovering=false;
+  const message=(el,text,kind='')=>{el.className='sf27-status'+(text?' notice'+(kind?' '+kind:''):'');el.textContent=text};
+  function setRecovery(value){
+   recovering=value;for(const field of ['recoveryCode','password2']){form.elements[field].disabled=!recovering;form.elements[field].required=recovering;form.elements[field].value=''}
+   q('[data-recovery]',form).classList.toggle('hidden',!recovering);q('[data-confirm]',form).classList.toggle('hidden',!recovering);
+   form.elements.password.value='';form.elements.password.minLength=recovering?8:0;form.elements.password.autocomplete=recovering?'new-password':'current-password';
+   q('[data-password-label]',form).textContent=recovering?'Mật khẩu mới':'Mật khẩu';submit.textContent=recovering?'Khôi phục tài khoản trường':'Đăng nhập tài khoản trường';recoveryToggle.textContent=recovering?'← Quay lại đăng nhập':'Quên mật khẩu?';message(box,'');
+  }
+  function clearResolved(){setRecovery(false);resolved=null;form.elements.username.value='';form.elements.password.disabled=true;submit.disabled=true;recoveryToggle.disabled=true;message(box,'')}
+  async function checkEndpoint(){
+   clearTimeout(lookupTimer);const ticket=++requestNumber,endpoint=url(form.elements.endpoint.value);clearResolved();
+   if(!form.elements.endpoint.value.trim()){message(checkBox,'Dán URL để tìm tài khoản của nhà trường.');return}
+   if(!endpoint){message(checkBox,'URL chưa đúng. Hãy dán URL /exec hoặc link quản trị.','warn');return}
+   message(checkBox,'Đang tra tài khoản trên Apps Script…');
+   try{
+    const result=await lookup(endpoint);if(ticket!==requestNumber||!gate.contains(form)||currentMode!=='login')return;
+    if(!result.configured||!result.username){message(checkBox,'URL này chưa kích hoạt tài khoản. Mở khu Kích hoạt tài khoản riêng để đăng ký.','warn');return}
+    resolved=result;form.elements.username.value=result.username;form.elements.password.disabled=false;submit.disabled=false;recoveryToggle.disabled=false;
+    message(checkBox,'Đã tìm thấy tài khoản '+result.username+(result.schoolName?' · '+result.schoolName:'')+'. Nhập mật khẩu để đăng nhập.','ok');
+   }catch(error){if(ticket===requestNumber&&gate.contains(form))message(checkBox,String(error?.message||error),'bad')}
+  }
+  form.elements.endpoint.addEventListener('input',()=>{++requestNumber;clearResolved();message(checkBox,'');clearTimeout(lookupTimer);lookupTimer=setTimeout(checkEndpoint,450)});
+  form.elements.endpoint.addEventListener('change',checkEndpoint);
+  form.elements.endpoint.addEventListener('paste',()=>{clearTimeout(lookupTimer);lookupTimer=setTimeout(checkEndpoint,0)});
+  recoveryToggle.onclick=()=>setRecovery(!recovering);
+  async function run(form,box,fn){
+   if(pending)return;pending=true;const button=q('button[type=submit]',form),label=button.textContent,controls=[...form.querySelectorAll('input,button')].map(el=>({el,disabled:el.disabled}));
+   for(const {el} of controls)el.disabled=true;
+   for(const tab of gate.querySelectorAll('[data-account-mode]'))tab.disabled=true;message(box,'Đang xác minh tài khoản…');
+   try{await fn()}catch(error){message(box,String(error?.message||error),'bad')}finally{pending=false;for(const {el,disabled} of controls)el.disabled=disabled;button.textContent=label;for(const tab of gate.querySelectorAll('[data-account-mode]'))tab.disabled=false}
+  }
+  form.onsubmit=event=>{event.preventDefault();return run(form,box,async()=>{
+   const endpoint=url(form.elements.endpoint.value),status=resolved;
+   if(!status||status.endpoint!==endpoint)throw new Error('Hãy đợi hệ thống tra xong tài khoản tại URL vừa dán.');
+   const password=form.elements.password.value;if(recovering){if(password!==form.elements.password2.value)throw new Error('Hai lần nhập mật khẩu không khớp.');await recover(endpoint,status.username,form.elements.recoveryCode.value,password)}
+   else if(status.kind==='writer')await w.loginRemoteAdminFromBase(endpoint,status.username,password);
+   else await login(endpoint,status.username,password);
+  })};
+  function drawSchool(){
+   if(!draft)return;q('#sf27SchoolSetup').classList.remove('hidden');q('#sf27SchoolCode').value=schoolCode(draft);q('#sf27RegisterUsername').value=draft.username;
+   q('#sf27SchoolSummary').textContent=draft.name+' · Tài khoản: '+draft.username+'. Mã chỉ dùng để kích hoạt tài khoản này trong một dự án riêng.';
+  }
+  const prepare=q('#sf27PrepareSchool');
+  prepare.onsubmit=event=>{event.preventDefault();if(pending)return;const name=prepare.elements.schoolName.value.trim(),username=prepare.elements.username.value.trim(),status=q('#sf27PrepareStatus');
+   if(!name||username.length<3||/[\u0000-\u001f]/.test(name+username)){message(status,'Nhập tên trường và tên tài khoản có ít nhất 3 ký tự.','bad');return}
+   if(!draft||draft.name!==name||draft.username!==username){draft={id:random().slice(0,32),name,username};try{sessionStorage.setItem('sf27_school_draft',JSON.stringify(draft))}catch{}q('#sf27ActivateForm').reset()}
+   drawSchool();message(status,'Đã tạo mã riêng. Hoàn tất hai bước dưới đây để kích hoạt.','ok');
+  };
+  for(const input of prepare.querySelectorAll('input'))input.addEventListener('input',()=>{q('#sf27SchoolSetup').classList.add('hidden');message(q('#sf27PrepareStatus'),'Tên trường hoặc tài khoản đang thay đổi. Bấm tạo mã riêng để cập nhật.','warn')});
+  q('#sf27CopySchool').onclick=async event=>{event.currentTarget.textContent=await copy(schoolCode(draft))?'Đã sao chép mã riêng':'Hãy sao chép mã phía dưới'};
+  q('#sf27DownloadSchool').onclick=()=>downloadCode(schoolCode(draft),'SF_Admin_'+draft.id.slice(0,8)+'.gs');
+  const activate=q('#sf27ActivateForm'),activateBox=q('#sf27ActivateStatus');
+  activate.onsubmit=event=>{event.preventDefault();return run(activate,activateBox,async()=>{
+   if(!draft||draft.name!==prepare.elements.schoolName.value.trim()||draft.username!==prepare.elements.username.value.trim())throw new Error('Hãy tạo lại mã riêng cho tên trường và tài khoản hiện tại.');
+   if(activate.elements.password.value!==activate.elements.password2.value)throw new Error('Hai lần nhập mật khẩu không khớp.');
+   await register(activate.elements.endpoint.value,activate.elements.registerCode.value,await credentials(draft.username,activate.elements.password.value),false,draft);
+   try{sessionStorage.removeItem('sf27_school_draft')}catch{}
+  })};
+  const def=q('#sf27DefaultForm'),defBox=q('#sf27DefaultStatus');
+  def.onsubmit=event=>{event.preventDefault();return run(def,defBox,async()=>{
+   let account=defaultAccount();const username=def.elements.username.value.trim(),password=def.elements.password.value;
+   if(account.username){if(username!==account.username||await passwordHash(password,account.salt,account.it||180000)!==account.hash)throw new Error('Tên tài khoản hoặc mật khẩu admin mặc định không đúng.')}
+   else{if(password!==def.elements.password2?.value)throw new Error('Hai lần nhập mật khẩu không khớp.');account=await credentials(username,password)}
+   await enterDefault(account,password);
+  })};
+  const forgotDefault=q('#sf28DefaultForgot'),defaultRecoveryForm=q('#sf28DefaultRecoveryForm');
+  if(forgotDefault)forgotDefault.onclick=()=>{const panel=q('#sf28DefaultRecoveryPanel'),open=panel.classList.contains('hidden');panel.classList.toggle('hidden',!open);forgotDefault.setAttribute('aria-expanded',String(open));forgotDefault.textContent=open?'Đóng phần khôi phục':'Quên mật khẩu admin mặc định?'};
+  if(defaultRecoveryForm)defaultRecoveryForm.onsubmit=event=>{event.preventDefault();return run(defaultRecoveryForm,q('#sf28DefaultRecoveryStatus'),()=>recoverDefault(defaultRecoveryForm.elements.username.value,defaultRecoveryForm.elements.recoveryCode.value,defaultRecoveryForm.elements.password.value,defaultRecoveryForm.elements.password2.value))};
+  function selectMode(mode,focus=false){
+   if(pending)return;currentMode=mode;++requestNumber;clearTimeout(lookupTimer);message(box,'');
+   for(const tab of gate.querySelectorAll('[data-account-mode]')){const active=tab.dataset.accountMode===mode;tab.classList.toggle('active',active);tab.setAttribute('aria-selected',String(active));tab.tabIndex=active?0:-1;if(active&&focus)tab.focus()}
+   for(const pane of gate.querySelectorAll('[data-account-pane]'))pane.classList.toggle('hidden',pane.dataset.accountPane!==mode);
+   if(mode!=='login'){form.elements.password.value='';form.elements.recoveryCode.value='';form.elements.password2.value=''}
+   else if(form.elements.endpoint.value.trim())checkEndpoint();
+  }
+  const tabs=[...gate.querySelectorAll('[data-account-mode]')];for(const tab of tabs){tab.onclick=()=>selectMode(tab.dataset.accountMode);tab.onkeydown=event=>{
+   const i=tabs.indexOf(tab),next=event.key==='ArrowRight'?(i+1)%3:event.key==='ArrowLeft'?(i+2)%3:event.key==='Home'?0:event.key==='End'?2:-1;
+   if(next>=0){event.preventDefault();selectMode(tabs[next].dataset.accountMode,true)}
+  }}
+  drawSchool();if(form.elements.endpoint.value.trim())checkEndpoint();else message(checkBox,'Dán URL để tìm tài khoản của nhà trường.');
+  try{installPasswordVisibility(gate)}catch{}
  }
  async function renderSetup(pane=q('#av-system')){
   if(!pane||q('#sf26Setup',pane))return;const active=linked(),account=w.localAdminAccount(),card=document.createElement('section');card.id='sf26Setup';card.className='card panel';card.style.marginBottom='18px';
@@ -6693,22 +6904,130 @@ window.SF_ADMIN_ACCOUNTS_CODE="/**\n * SmartForms Accounts 26.0 — một tài k
   if(active){q('[data-account-copy-link]',card).onclick=async e=>{e.currentTarget.textContent=await copy(adminLink())?'Đã sao chép':'Hãy sao chép link phía trên'};q('[data-account-save]',card).onclick=e=>run(e.currentTarget,async()=>{await saveConfig();box.className='notice ok';box.textContent='Đã lưu cấu hình vào tài khoản.'});q('[data-account-restore]',card).onclick=e=>run(e.currentTarget,async()=>{await restore(true);await window.sf22RenderSystem();notice('Đã khôi phục cấu hình từ tài khoản.')})}
   else q('#sf26MigrateForm',card).onsubmit=e=>{e.preventDefault();const data=Object.fromEntries(new FormData(e.currentTarget));return run(e.submitter||q('button[type=submit]',e.currentTarget),()=>register(data.endpoint,data.registerCode,w.localAdminAccount(),true))};
  }
- const originalSettings=renderSettings;
- renderSettings=async function(...args){
-  if(!linked())return originalSettings.apply(this,args);const a=w.localAdminAccount(),pane=q('#av-settings');
-  pane.innerHTML='<div class="sectionHead"><div><h2>Tài khoản quản trị</h2><p>Thay đổi được lưu trên Apps Script Tài khoản admin.</p></div></div><div class="card panel"><form id="sf26ChangeAccount" class="formgrid"><div class="field full"><label>Tên đăng nhập</label><input name="username" required minlength="3" maxlength="80" value="'+h(a.username)+'"></div><div class="field full"><label>Mật khẩu hiện tại</label><input name="current" type="password" required autocomplete="current-password"></div><div class="field"><label>Mật khẩu mới (bỏ trống nếu giữ nguyên)</label><input name="password" type="password" minlength="8" autocomplete="new-password"></div><div class="field"><label>Nhập lại mật khẩu mới</label><input name="password2" type="password" autocomplete="new-password"></div><div class="field full"><button class="btn primary" type="submit">Lưu thay đổi tài khoản</button></div></form><div id="sf26ChangeProgress" role="status" style="margin-top:12px"></div></div>';
-  q('#sf26ChangeAccount').onsubmit=async e=>{e.preventDefault();const data=Object.fromEntries(new FormData(e.currentTarget)),button=e.submitter||q('button[type=submit]',e.currentTarget),box=q('#sf26ChangeProgress');button.disabled=true;try{if(data.password!==data.password2)throw new Error('Hai lần nhập mật khẩu mới không khớp.');const endpoint=url(w.currentAdminEndpoint()),next=await credentials(data.username,data.password||data.current),currentHash=await passwordHash(data.current,w.localAdminAccount().salt,w.localAdminAccount().it||180000),r=await rpc(endpoint,'accountChange',{username:next.username,salt:next.salt,hash:next.hash,iterations:next.it,currentHash});w.saveLocalAdminAccount(next);w.rememberAdminBinding(next.username,endpoint);keepSession(endpoint,r);for(const key of ['current','password','password2'])e.currentTarget.elements[key].value='';box.className='notice ok';box.textContent='Đã cập nhật tài khoản. Các phiên đăng nhập cũ cần đăng nhập lại.'}catch(error){box.className='notice bad';box.textContent=String(error?.message||error)}finally{button.disabled=false}};
+ /* Thông tin đã xác thực chỉ giữ trong phiên của đúng tài khoản. */
+ const SECRET_PREFIX='sf28_verified_account_',preparedPasswords=new WeakMap(),secretMemory=new Map();
+ function secretKey(endpoint=url(w.currentAdminEndpoint())){return SECRET_PREFIX+(endpoint||'default')}
+ function rawSecret(endpoint){try{return secretMemory.get(secretKey(endpoint))||JSON.parse(sessionStorage.getItem(secretKey(endpoint))||'null')}catch{return null}}
+ function clearSecrets(endpoint=url(w.currentAdminEndpoint())){
+  secretMemory.delete(secretKey(endpoint));try{sessionStorage.removeItem(secretKey(endpoint))}catch{}
+  if(endpoint===url(w.currentAdminEndpoint())){for(const id of ['#sf28PasswordValue','#sf28RecoveryValue']){const node=q(id);if(node)node.textContent=''}q('#av-settings')?.replaceChildren()}
+ }
+ function rememberSecrets(password='',recoveryCode='',account=w.localAdminAccount(),endpoint=url(w.currentAdminEndpoint()),expiresAt=0){
+  const old=rawSecret(endpoint),same=old?.username===account.username&&old?.salt===account.salt&&old?.hash===account.hash&&old?.expiresAt>Date.now();
+  const value={username:account.username,salt:account.salt,hash:account.hash,password:String(password||same&&old.password||''),recoveryCode:String(recoveryCode||same&&old.recoveryCode||''),expiresAt:Number(expiresAt||session(endpoint)?.expiresAt||Date.now()+6*60*60*1000)};
+  secretMemory.set(secretKey(endpoint),value);try{sessionStorage.setItem(secretKey(endpoint),JSON.stringify(value))}catch{}
+ }
+ function secretState(){
+  const endpoint=url(w.currentAdminEndpoint()),a=w.localAdminAccount(),value=rawSecret(endpoint);
+  if(!state.admin||isParentPortal())return{};
+  if(linked()&&!session(endpoint)){clearSecrets(endpoint);return{}}
+  if(!value||value.expiresAt<=Date.now()||value.username!==a.username||value.salt!==a.salt||value.hash!==a.hash){if(value)clearSecrets(endpoint);return{}}
+  return value;
+ }
+ async function recoveryDigest(value){const result=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(String(value||'').trim()));return Array.from(new Uint8Array(result),v=>v.toString(16).padStart(2,'0')).join('')}
+ function recoveryText(){return'SFRC-'+random().toUpperCase().match(/.{1,8}/g).join('-')}
+ async function defaultRecovery(account,rotate=false){
+  if(account.recoveryCode&&account.recoveryHash&&!rotate)return account;
+  if(account.recoveryHash&&!rotate)return account;
+  const recoveryCode=recoveryText();return{...account,recoveryCode,recoveryHash:await recoveryDigest(recoveryCode)};
+ }
+ async function loadRecovery(rotate=false){
+  if(!state.admin||isParentPortal())throw new Error('Hãy đăng nhập quản trị để xem mã khôi phục.');
+  const db=DB,endpoint=url(w.currentAdminEndpoint()),account=w.localAdminAccount();let code='';
+  if(linked()){
+   if(!session(endpoint))throw new Error('Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại.');
+   let result;try{result=await rpc(endpoint,rotate?'accountRecoveryRotate':'accountRecoveryGet')}catch(error){if(/không được hỗ trợ|Chức năng không|invalid action/i.test(String(error?.message||error)))throw new Error('Cập nhật mã Apps Script Tài khoản admin trong Thiết lập hệ thống rồi triển khai phiên bản mới để xem mã khôi phục.');throw error}same(db);code=String(result.recoveryCode||'');
+  }else if(endpoint){
+   const result=await w.sharedPublicPostAt(endpoint,{action:'adminLogin',username:account.username,hash:account.hash,rotateRecovery:rotate},65000);same(db);
+   if(result.username!==account.username)throw new Error('Tài khoản phản hồi không khớp với phiên đăng nhập.');
+   code=String(result.recoveryCode||'');if(!code)throw new Error('Cập nhật mã Apps Script Ghi dữ liệu trong Thiết lập hệ thống rồi triển khai phiên bản mới để xem mã khôi phục.');
+  }else{
+   const next=await defaultRecovery(account,rotate);same(db);w.saveLocalAdminAccount(next);code=String(next.recoveryCode||'');
+  }
+  if(!state.admin||endpoint!==url(w.currentAdminEndpoint())||w.localAdminAccount().hash!==account.hash)throw new Error('Tài khoản đã thay đổi. Hãy mở lại mục Tài khoản.');
+  rememberSecrets('',code,w.localAdminAccount(),endpoint);return code;
+ }
+ async function recoverDefault(username,code,password,password2){
+  const account=defaultAccount();if(!account.username||username.trim()!==account.username||!account.recoveryHash||await recoveryDigest(code)!==account.recoveryHash)throw new Error('Tên tài khoản hoặc mã khôi phục admin mặc định không đúng.');
+  if(password!==password2)throw new Error('Hai lần nhập mật khẩu mới không khớp.');
+  let next=await credentials(account.username,password);next=await defaultRecovery(next,true);await enterDefault(next,password);showRecovery(next.recoveryCode);return next;
+ }
+ async function updateAccount(username,password='',password2=''){
+  if(!state.admin||isParentPortal())throw new Error('Hãy đăng nhập quản trị trước khi đổi tài khoản.');
+  username=String(username||'').trim();if(username.length<3||username.length>80||/[\u0000-\u001f]/.test(username))throw new Error('Tên tài khoản cần 3–80 ký tự.');
+  if(password!==password2)throw new Error('Hai lần nhập mật khẩu mới không khớp.');
+  const db=DB,endpoint=url(w.currentAdminEndpoint()),old=w.localAdminAccount(),view=secretState();
+  const next=password?await credentials(username,password):{username,salt:old.salt,hash:old.hash,it:old.it||180000};same(db);
+  let response=null;
+  if(linked()){
+   if(!session(endpoint))throw new Error('Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại.');
+   response=await rpc(endpoint,'accountChange',{username:next.username,salt:next.salt,hash:next.hash,iterations:next.it,currentHash:old.hash});same(db);
+  }else if(endpoint){await w.syncAdminAccountRemote(next);same(db)}
+  else{next.recoveryCode=old.recoveryCode||'';next.recoveryHash=old.recoveryHash||''}
+  if(!state.admin||endpoint!==url(w.currentAdminEndpoint())||w.localAdminAccount().hash!==old.hash)throw new Error('Tài khoản đã thay đổi. Hãy đăng nhập lại để lấy thông tin mới.');
+  w.saveLocalAdminAccount(next);if(endpoint)w.moveAdminBinding(old.username,next.username);if(response)keepSession(endpoint,response);
+  const recoveryCode=response?.recoveryCode||view.recoveryCode||next.recoveryCode||'';rememberSecrets(password||view.password||'',recoveryCode,next,endpoint,response?.expiresAt||0);
+  return next;
+ }
+ renderSettings=async function(){
+  const pane=q('#av-settings');if(!pane)return;
+  if(!state.admin||isParentPortal())return renderAdminGate();
+  if(linked()&&!session()){clearSecrets();state.admin=false;return renderAdminGate()}
+  const account=w.localAdminAccount(),db=DB,endpoint=url(w.currentAdminEndpoint()),view=secretState();let passwordShown=true,recoveryShown=true;
+  pane.innerHTML=`<div class="sectionHead"><div><h2>Tài khoản admin</h2><p>Xem thông tin tài khoản và thay đổi mật khẩu ngay trong phiên đăng nhập.</p></div></div>
+   <div class="sf28-secrets">
+    <section class="card panel sf28-secret"><div class="sf28-secret-head"><span class="sf28-key-icon" aria-hidden="true">🔑</span><div><h3>Mật khẩu hiện tại</h3><p>Của tài khoản ${h(account.username||'')}</p></div></div>
+     <output id="sf28PasswordValue" class="sf28-secret-value" aria-label="Mật khẩu hiện tại"></output>
+     <div class="actions"><button class="btn secondary" type="button" id="sf28HidePassword">Ẩn mật khẩu</button><button class="btn ghost" type="button" id="sf28CopyPassword">Sao chép mật khẩu</button></div>
+     <p class="field-hint" id="sf28PasswordHint"></p>
+    </section>
+    <section class="card panel sf28-secret"><div class="sf28-secret-head"><span class="sf28-key-icon" aria-hidden="true">🗝</span><div><h3>Mã khôi phục khi quên mật khẩu</h3><p>Dùng trong mục Quên mật khẩu? ở màn hình đăng nhập</p></div></div>
+     <output id="sf28RecoveryValue" class="sf28-secret-value" aria-label="Mã khôi phục tài khoản"></output>
+     <div class="actions"><button class="btn secondary" type="button" id="sf28HideRecovery" disabled>Ẩn mã</button><button class="btn ghost" type="button" id="sf28CopyRecovery" disabled>Sao chép mã</button><button class="btn ghost" type="button" id="sf28RotateRecovery">Tạo mã khôi phục mới</button></div>
+     <p class="field-hint" id="sf28RecoveryHint" role="status" aria-live="polite"></p>
+    </section>
+   </div>
+   <div class="card panel" style="margin-top:18px"><h3 style="margin-top:0">Thay đổi tài khoản</h3><p class="field-hint">Nhập mật khẩu mới hai lần rồi lưu. Để trống hai ô mật khẩu nếu chỉ đổi tên tài khoản.</p>
+    <form id="sf26ChangeAccount" class="formgrid"><div class="field full"><label for="sf28AccountUsername">Tên đăng nhập</label><input id="sf28AccountUsername" name="username" required minlength="3" maxlength="80" value="${h(account.username||'')}" autocomplete="username"></div>
+     <div class="field"><label for="sf28NewPassword">Mật khẩu mới</label><input id="sf28NewPassword" name="password" type="password" minlength="8" autocomplete="new-password"></div>
+     <div class="field"><label for="sf28NewPassword2">Nhập lại mật khẩu mới</label><input id="sf28NewPassword2" name="password2" type="password" minlength="8" autocomplete="new-password"></div>
+     <div class="field full"><button class="btn primary" type="submit">Lưu thay đổi tài khoản</button></div>
+    </form><div id="sf26ChangeProgress" role="status" aria-live="polite" style="margin-top:12px"></div>
+   </div>`;
+  const current=()=>state.admin&&DB===db&&url(w.currentAdminEndpoint())===endpoint&&w.localAdminAccount().hash===account.hash&&pane.contains(q('#sf28PasswordValue'));
+  function paintPassword(){const value=secretState().password||'',out=q('#sf28PasswordValue');if(!out)return;out.textContent=value?(passwordShown?value:'••••••••••••'):'Đăng nhập lại để xem mật khẩu của phiên này.';q('#sf28HidePassword').disabled=!value;q('#sf28CopyPassword').disabled=!value;q('#sf28PasswordHint').textContent=value?'Chỉ hiển thị trong phiên đăng nhập đã xác thực.': 'Bạn vẫn có thể đặt mật khẩu mới bên dưới khi đang đăng nhập.'}
+  function paintRecovery(code){q('#sf28RecoveryValue').textContent=code?(recoveryShown?code:'••••••••••••'):'Chưa có mã có thể hiển thị';q('#sf28HideRecovery').disabled=!code;q('#sf28CopyRecovery').disabled=!code}
+  paintPassword();paintRecovery(view.recoveryCode||'');
+  q('#sf28HidePassword').onclick=event=>{passwordShown=!passwordShown;event.currentTarget.textContent=passwordShown?'Ẩn mật khẩu':'Hiện mật khẩu';paintPassword()};
+  q('#sf28CopyPassword').onclick=async event=>{const button=event.currentTarget,value=secretState().password;if(value)button.textContent=await copy(value)?'Đã sao chép':'Hãy chọn mật khẩu để sao chép'};
+  q('#sf28HideRecovery').onclick=event=>{recoveryShown=!recoveryShown;event.currentTarget.textContent=recoveryShown?'Ẩn mã':'Hiện mã';paintRecovery(secretState().recoveryCode||'')};
+  q('#sf28CopyRecovery').onclick=async event=>{const button=event.currentTarget,value=secretState().recoveryCode;if(value)button.textContent=await copy(value)?'Đã sao chép':'Hãy chọn mã để sao chép'};
+  let recoveryBusy=false;
+  const refreshRecovery=async rotate=>{
+   if(recoveryBusy||!current())return;recoveryBusy=true;const button=q('#sf28RotateRecovery'),hint=q('#sf28RecoveryHint');button.disabled=true;hint.textContent=rotate?'Đang tạo mã khôi phục mới…':'Đang lấy mã khôi phục của tài khoản…';
+   try{const code=await loadRecovery(rotate);if(!current())return;paintRecovery(code);hint.textContent=code?(rotate?'Đã tạo mã mới. Hãy lưu mã này; mã cũ đã hết hiệu lực.':'Lưu mã này để đặt lại mật khẩu khi quên.'):'Mã khôi phục cũ chỉ lưu dạng băm nên không thể đọc lại. Bấm Tạo mã khôi phục mới để lấy mã có thể sao chép.'}
+   catch(error){if(current())hint.textContent=String(error?.message||error)}finally{recoveryBusy=false;if(button.isConnected)button.disabled=false}
+  };
+  q('#sf28RotateRecovery').onclick=()=>{if(confirm('Tạo mã khôi phục mới? Mã cũ sẽ hết hiệu lực.'))refreshRecovery(true)};
+  const form=q('#sf26ChangeAccount');form.onsubmit=async event=>{
+   event.preventDefault();if(form.dataset.saving==='1'||recoveryBusy)return;form.dataset.saving='1';const button=event.submitter||q('button[type=submit]',form),box=q('#sf26ChangeProgress'),username=form.elements.username.value,password=form.elements.password.value,password2=form.elements.password2.value,controls=[...form.querySelectorAll('input,button')];for(const el of controls)el.disabled=true;q('#sf28RotateRecovery').disabled=true;box.className='notice';box.textContent='Đang lưu tài khoản…';
+   try{await updateAccount(username,password,password2);await renderSettings();const updated=q('#sf26ChangeProgress');updated.className='notice ok';updated.textContent='Đã lưu tài khoản và cập nhật mật khẩu đang hiển thị.'}
+   catch(error){box.className='notice bad';box.textContent=String(error?.message||error)}finally{delete form.dataset.saving;for(const el of controls)el.disabled=false;if(current())q('#sf28RotateRecovery').disabled=false}
+  };
+  try{installPasswordVisibility(pane)}catch{}
+  await refreshRecovery(false);
  };window.renderSettings=renderSettings;
+
  const originalGate=renderAdminGate;
  renderAdminGate=async function(...args){
   if(isParentPortal())return originalGate.apply(this,args);
-  if(state.admin&&linked()&&!session())state.admin=false;
+  if(state.admin&&linked()&&!session()){clearSecrets();state.admin=false}
   if(state.admin){const result=await originalGate.apply(this,args);showRecovery();return result}
-  if(legacyGate)return originalGate.apply(this,args);return renderLogin();
+  return renderLogin();
  };window.renderAdminGate=renderAdminGate;
  const originalLogout=window.logoutAdmin;
- window.logoutAdmin=function(...args){const endpoint=url(w.currentAdminEndpoint()),s=session(endpoint);if(linked()){sessionStorage.removeItem(sessionKey(endpoint));restored.delete(DB?.name);recoveryPending='';q('#sf26RecoveryNotice')?.remove();if(s)rpc(endpoint,'accountLogout',{},s.session).catch(()=>{});legacyGate=false}return originalLogout.apply(this,args)};
- window.sf26Accounts={linked,saveConfig,restore,shorten,adminLink,renderSetup,renderLogin,login,register,recover,info};
+ window.logoutAdmin=function(...args){const endpoint=url(w.currentAdminEndpoint()),s=session(endpoint);clearSecrets(endpoint);recoveryPending='';q('#sf26RecoveryNotice')?.remove();if(linked()){sessionStorage.removeItem(sessionKey(endpoint));restored.delete(DB?.name);recoveryPending='';q('#sf26RecoveryNotice')?.remove();if(s)rpc(endpoint,'accountLogout',{},s.session).catch(()=>{});legacyGate=false}return originalLogout.apply(this,args)};
+ window.sf26Accounts={linked,saveConfig,restore,shorten,adminLink,renderSetup,renderLogin,login,register,recover,info,lookup,schoolCode,rememberSecrets,credentialsView:{read:secretState,loadRecovery,updateAccount,recoverDefault,enterDefault}};
 })();
 /* ===== Kết thúc SmartForms 26 ===== */
 
